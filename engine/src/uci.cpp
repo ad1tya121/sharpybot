@@ -12,10 +12,11 @@
 #include <atomic>
 
 namespace uci {
-
-using clock = std::chrono::steady_clock;
-clock::time_point searchStart;
-clock::time_point searchEnd;
+    
+    using clock = std::chrono::steady_clock;
+    clock::time_point searchStart;
+    clock::time_point searchEnd;
+    bool useTimer = false;
 
 namespace {
 
@@ -245,13 +246,12 @@ void handleGo(std::istringstream& iss) {
     stopSearch = false;
 
     if (allocatedMs > 0) {
-        // Set the exact deadline timestamp
         searchEnd = searchStart + std::chrono::milliseconds(allocatedMs);
+        useTimer = true;  // <-- TURN ON TIMER
     } else {
-        // Fallback for infinite or depth-only search
-        searchEnd = searchStart;
+        useTimer = false; // <-- TURN OFF TIMER (for go depth)
     }
-
+    
     Move best = findBestMove(board, depth < 0 ? 64 : depth);
     std::cout << "bestmove " << moveToString(best) << std::endl;
 }
