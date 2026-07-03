@@ -117,15 +117,12 @@ void orderMoves(Board& board, MoveList& moves, Move ttBestMove, int ply){
 int quiescence(Board& board, int alpha, int beta, int ply){
     // 1. Increment the master node counter
     nodeCount++;
-
-    // 2. Poll the clock every 2048 nodes
+    
     if ((nodeCount & 2047) == 0) {
-        if (uci::searchEnd != uci::searchStart && uci::clock::now() >= uci::searchEnd) {
-            stopSearch = true;
+            if (uci::useTimer && uci::clock::now() >= uci::searchEnd) {
+                stopSearch = true;
+            }
         }
-    }
-
-    // 3. If time expired, abort immediately
     if (stopSearch.load()) return 0;
     bool inCheck = isKingInCheck(board, board.sideToMove);
     int best_value = -infinity;
@@ -170,14 +167,12 @@ int quiescence(Board& board, int alpha, int beta, int ply){
 int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
     nodeCount++;
 
-    // --- EDITED TIME CONTROL CHECK ---
     if ((nodeCount & 2047) == 0) {
-        if (uci::searchEnd != uci::searchStart && uci::clock::now() >= uci::searchEnd) {
+        if (uci::useTimer && uci::clock::now() >= uci::searchEnd) {
             stopSearch = true;
         }
     }
     if (stopSearch.load()) return 0;
-    // ---------------------------------
 
     int originalAlpha = alpha;
     bool inCheck = isKingInCheck(board, board.sideToMove);
@@ -255,6 +250,8 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
         }
 
         unMakeMove(board, current_move);
+
+        if (stopSearch.load()) return 0;
         
         if(score > best_value) {
             best_value = score;
