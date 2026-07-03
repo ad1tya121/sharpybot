@@ -4,12 +4,12 @@
 // inline const used because this will define once in header and 
 // no other file which needs this wont make another copy of it
 
-inline const U64 notAFile = ~0x0101010101010101ULL;
-inline const U64 notHFile = ~0x8080808080808080ULL;
-inline const U64 notBFile = ~0x0202020202020202ULL;
-inline const U64 notGFile = ~0x4040404040404040ULL;
-inline const U64 notABFile = notAFile & notBFile;
-inline const U64 notGHFile = notGFile & notHFile;
+constexpr U64 notAFile = ~0x0101010101010101ULL;
+constexpr U64 notHFile = ~0x8080808080808080ULL;
+constexpr U64 notBFile = ~0x0202020202020202ULL;
+constexpr U64 notGFile = ~0x4040404040404040ULL;
+constexpr U64 notABFile = notAFile & notBFile;
+constexpr U64 notGHFile = notGFile & notHFile;
 
 // AttackTables 
 extern U64 knightAttacks[64];
