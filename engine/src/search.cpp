@@ -15,6 +15,7 @@ namespace uci {
     using clock = std::chrono::steady_clock;
     extern clock::time_point searchStart;
     extern clock::time_point searchEnd;
+    extern bool useTimer;
 }
 
 std::atomic<bool> stopSearch{false};
