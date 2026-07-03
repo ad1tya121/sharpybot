@@ -2,6 +2,8 @@
 #include "board.h"
 #include "movegen.h"
 #include <string>
+#include <thread>
+#include <chrono>
 
 namespace uci {
     void loop();
