@@ -6,6 +6,12 @@
 #include <chrono>
 
 namespace uci {
+    using clock = std::chrono::steady_clock; // Makes your code cleaner
+    extern clock::time_point searchStart;
+    extern clock::time_point searchEnd;
+    
+    // --- ADDED THIS LINE RIGHT HERE ---
+    extern bool useTimer;
     void loop();
 
     int squareFromString(const std::string& s);
