@@ -9,6 +9,13 @@
 #include <iostream>
 #include <cstring>
 #include <cmath>
+#include <chrono>
+
+namespace uci {
+    using clock = std::chrono::steady_clock;
+    extern clock::time_point searchStart;
+    extern clock::time_point searchEnd;
+}
 
 std::atomic<bool> stopSearch{false};
 long long nodeCount = 0;
@@ -148,7 +155,16 @@ int quiescence(Board& board, int alpha, int beta, int ply){
 
 int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
     nodeCount++;
-    if ((nodeCount & 2047) == 0 && stopSearch.load()) return 0;
+
+    // --- EDITED TIME CONTROL CHECK ---
+    if ((nodeCount & 2047) == 0) {
+        if (uci::searchEnd != uci::searchStart && uci::clock::now() >= uci::searchEnd) {
+            stopSearch = true;
+        }
+    }
+    if (stopSearch.load()) return 0;
+    // ---------------------------------
+
     int originalAlpha = alpha;
     bool inCheck = isKingInCheck(board, board.sideToMove);
 

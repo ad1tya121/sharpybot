@@ -8,11 +8,14 @@
 #include <iostream>
 #include <sstream>
 #include <chrono>
-#include <thread>
 #include <algorithm>
 #include <atomic>
 
 namespace uci {
+
+using clock = std::chrono::steady_clock;
+clock::time_point searchStart;
+clock::time_point searchEnd;
 
 namespace {
 
@@ -20,8 +23,6 @@ Board board;
 constexpr int INF = 1'000'000;
 std::atomic<int> searchId{0};
 
-using clock = std::chrono::steady_clock;
-clock::time_point searchStart;
 
 long long elapsed() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -114,9 +115,15 @@ Move findBestMove(Board& b, int maxDepth) {
 
 
     for (int depth = 1; depth <= maxDepth; depth++) {
+
+        // Check if time expired before diving into a deeper iteration
+        if (searchEnd != searchStart && clock::now() >= searchEnd) {
+            stopSearch = true;
+        }
+        if (stopSearch.load()) break;
+
         long long nodesAtStart = nodeCount;
         long long timeAtStart  = elapsed();
-        if (stopSearch.load()) break;
 
         int score = alphaBeta(b, -INF, INF, depth, 0);
 
@@ -235,16 +242,14 @@ void handleGo(std::istringstream& iss) {
         allocatedMs = std::max(allocatedMs, 10LL);
     }
 
-    // bump search generation so stale timer threads don't fire into next search
-    stopSearch    = false;
-    int currentId = ++searchId;
+    stopSearch = false;
 
     if (allocatedMs > 0) {
-        std::thread([allocatedMs, currentId]() {
-            std::this_thread::sleep_for(std::chrono::milliseconds(allocatedMs));
-            if (searchId.load() == currentId)
-                stopSearch = true;
-        }).detach();
+        // Set the exact deadline timestamp
+        searchEnd = searchStart + std::chrono::milliseconds(allocatedMs);
+    } else {
+        // Fallback for infinite or depth-only search
+        searchEnd = searchStart;
     }
 
     Move best = findBestMove(board, depth < 0 ? 64 : depth);
