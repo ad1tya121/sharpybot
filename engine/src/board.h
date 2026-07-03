@@ -12,7 +12,15 @@ struct Move
     bool isEnpassant;
     bool isCastle;
 
-    bool operator==(const Move& other) const = default;
+    bool operator==(const Move& other) const {
+        return (StartSquare   == other.StartSquare)  &&
+               (TargetSquare  == other.TargetSquare) &&
+               (captured      == other.captured)     &&
+               (promoted      == other.promoted)     &&
+               (isEnpassant   == other.isEnpassant)  &&
+               (isCastle      == other.isCastle);
+    }
+    
     bool operator!=(const Move& other) const { return !(*this == other); }
 };
 
