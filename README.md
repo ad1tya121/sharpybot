@@ -6,8 +6,8 @@ A personalized chess assistant built on a custom UCI chess engine and reinforcem
 
 - [Git](https://git-scm.com/downloads)
 - [CMake](https://cmake.org/download/) 3.10 or newer
-- A C++20 compiler:
-  - **Linux/macOS**: GCC or Clang (usually pre-installed, or via `xcode-select --install` on macOS / your package manager on Linux)
+- A C++17 compatible compiler:
+  - **Linux/macOS**: GCC 8+ or Clang 7+ (usually pre-installed, or via `xcode-select --install` on macOS / your package manager on Linux)
   - **Windows**: [MSYS2/MinGW-w64](https://www.msys2.org/) or Visual Studio Build Tools with C++ support
 
 ## HOW TO USE
