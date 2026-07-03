@@ -117,12 +117,12 @@ Move findBestMove(Board& b, int maxDepth) {
 
     for (int depth = 1; depth <= maxDepth; depth++) {
 
-        // Check if time expired before diving into a deeper iteration
-        if (searchEnd != searchStart && clock::now() >= searchEnd) {
+        // Only abort due to time if we are actually using the timer
+        if (useTimer && clock::now() >= searchEnd) {
             stopSearch = true;
         }
         if (stopSearch.load()) break;
-
+    
         long long nodesAtStart = nodeCount;
         long long timeAtStart  = elapsed();
 
@@ -247,9 +247,10 @@ void handleGo(std::istringstream& iss) {
 
     if (allocatedMs > 0) {
         searchEnd = searchStart + std::chrono::milliseconds(allocatedMs);
-        useTimer = true;  // <-- TURN ON TIMER
+        useTimer = true;  
     } else {
-        useTimer = false; // <-- TURN OFF TIMER (for go depth)
+        searchEnd = searchStart; // Reset it so 'searchEnd != searchStart' checks fail safely
+        useTimer = false; 
     }
     
     Move best = findBestMove(board, depth < 0 ? 64 : depth);
