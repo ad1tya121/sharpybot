@@ -1,4 +1,3 @@
-cat > ./README.md << 'EOF'
 # sharpybot
 
 A personalized chess assistant built on a custom UCI chess engine and reinforcement learning. For players who want more than just the best move.
@@ -26,13 +25,3 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/ad1tya121/sharpybot/main
 ```powershell
 irm https://raw.githubusercontent.com/ad1tya121/sharpybot/main/run-sharpybot.ps1 | iex
 ```
-
-## License
-
-See [LICENSE](LICENSE).
-EOF
-echo done
-Output
-
-done
-Done
