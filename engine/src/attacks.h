@@ -1,15 +1,13 @@
 #pragma once
 #include "board.h"
 
-// inline const used because this will define once in header and 
-// no other file which needs this wont make another copy of it
 
-constexpr U64 notAFile = ~0x0101010101010101ULL;
-constexpr U64 notHFile = ~0x8080808080808080ULL;
-constexpr U64 notBFile = ~0x0202020202020202ULL;
-constexpr U64 notGFile = ~0x4040404040404040ULL;
-constexpr U64 notABFile = notAFile & notBFile;
-constexpr U64 notGHFile = notGFile & notHFile;
+constexpr const U64 notAFile = ~0x0101010101010101ULL;
+constexpr const U64 notHFile = ~0x8080808080808080ULL;
+constexpr const U64 notBFile = ~0x0202020202020202ULL;
+constexpr const U64 notGFile = ~0x4040404040404040ULL;
+constexpr const U64 notABFile = notAFile & notBFile;
+constexpr const U64 notGHFile = notGFile & notHFile;
 
 // AttackTables 
 extern U64 knightAttacks[64];

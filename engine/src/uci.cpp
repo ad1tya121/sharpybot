@@ -157,8 +157,6 @@ Move findBestMove(Board& b, int maxDepth) {
 namespace {
 
 void handleUCI() {
-    std::cout << "id name PaperRex\n";
-    std::cout << "id author NotTofuu\n";
     std::cout << "uciok" << std::endl;
 }
 

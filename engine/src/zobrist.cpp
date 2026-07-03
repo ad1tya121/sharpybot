@@ -24,3 +24,9 @@ void initZobrist(){
     zobrist.z_side = prng();
 }
 
+void togglePieceHash(Board& board, Color side, int piece, int square) {
+    if (piece != NONE) {
+        int zIndex = (side * 6) + piece;
+        board.hash ^= zobrist.z_pieces[zIndex][square];
+    }
+}

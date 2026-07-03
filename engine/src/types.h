@@ -18,12 +18,12 @@ enum Color {WHITE, BLACK};
 enum PieceType {NONE = -1, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
 // enum NNUEPieceType {PAWN, KNIGHT, BISHOP, ROOK, QUEEN};
 
-inline U64  getBit  (U64 bb, int sq)  { return bb & (1ULL << sq); }
-inline void setBit  (U64& bb, int sq) { bb |= (1ULL << sq); }  // mark the bit on that square = 1
-inline void clearBit(U64& bb, int sq) { bb &= ~(1ULL << sq); } // mark the bit on that square = 0 
-inline int getLSB   (U64 bb)          { return __builtin_ctzll(bb); } // find the index of least significant bit
-inline int popLSB   (U64& bb)         { int sq = getLSB(bb); bb &= bb - 1; return sq; }
-inline int countBits(U64 bb)          { return __builtin_popcountll(bb); }
+constexpr U64  getBit  (U64 bb, int sq)  { return bb & (1ULL << sq); }
+constexpr void setBit  (U64& bb, int sq) { bb |= (1ULL << sq); }  // mark the bit on that square = 1
+constexpr void clearBit(U64& bb, int sq) { bb &= ~(1ULL << sq); } // mark the bit on that square = 0 
+constexpr int getLSB   (U64 bb)          { return __builtin_ctzll(bb); } // find the index of least significant bit
+constexpr int popLSB   (U64& bb)         { int sq = getLSB(bb); bb &= bb - 1; return sq; }
+constexpr int countBits(U64 bb)          { return __builtin_popcountll(bb); }
 
 constexpr uint8_t WK_CASTLE = 0b0001; // white kingside
 constexpr uint8_t WQ_CASTLE = 0b0010; // white queenside

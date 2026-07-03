@@ -4,7 +4,7 @@
 Network net;
 Accumulator accStack[512];
 
-inline int32_t CReLU(int16_t value, int16_t min, int16_t max){
+int32_t CReLU(int16_t value, int16_t min, int16_t max){
     if (value <= min) return min;
     if (value >= max) return max;
     return value;

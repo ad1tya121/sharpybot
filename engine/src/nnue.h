@@ -38,3 +38,4 @@ void initAccumulator(const Board& board, Accumulator& acc);
 int32_t nnueEval(const Board& board, int ply);
 bool loadNetwork(const char* path);
 void updateAccumulator(const Board& board, int ply, Move move);
+int32_t CReLU(int16_t value, int16_t min, int16_t max);

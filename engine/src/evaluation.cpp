@@ -1,6 +1,9 @@
 #include "board.h"
 #include "evaluation.h"
 
+int pestoSq(int square, Color side) {
+    return (side == WHITE) ? FLIP(square) : square;
+}
 
 int evaluate(Board& board){
     int mgScore[2] = {0, 0};
@@ -31,4 +34,6 @@ int evaluate(Board& board){
     int score = (  (mgTotal * gamePhase) + (egTotal * (24 - gamePhase))  ) / 24;
     return board.sideToMove == WHITE ? score : -score;
 }
+
+
 

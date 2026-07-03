@@ -21,14 +21,6 @@ extern Smagic mBishopTable[64];
 
 void initMagicTables();
 
-inline U64 rookAttacks(int square, U64 boardOccupancy) {
-    U64 blockers = boardOccupancy & mRookTable[square].mask;
-    unsigned int index = (blockers * mRookTable[square].magic) >> mRookTable[square].shift;
-    return mRookTable[square].ptr[index];
-}
+U64 rookAttacks(int square, U64 boardOccupancy);
 
-inline U64 bishopAttacks(int square, U64 boardOccupancy) {
-    U64 blockers = boardOccupancy & mBishopTable[square].mask;
-    unsigned int index = (blockers * mBishopTable[square].magic) >> mBishopTable[square].shift;
-    return mBishopTable[square].ptr[index];
-}
+U64 bishopAttacks(int square, U64 boardOccupancy);
