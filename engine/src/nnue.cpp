@@ -100,8 +100,6 @@ bool loadNetwork(const char* path){
 }
 
 void updateAccumulator(const Board& board, int ply, Move move){
-    accStack[ply + 1] = accStack[ply];
-    
     int white_king_sq = getLSB(board.pieces[WHITE][KING]);
     int black_king_sq = getLSB(board.pieces[BLACK][KING]);
     Color side = board.sideToMove;
@@ -113,60 +111,56 @@ void updateAccumulator(const Board& board, int ply, Move move){
         if(getBit(board.pieces[side][p], move.StartSquare)) { movingPiece = p; break; }
     }
 
-    if(movingPiece == KING) return; // full refresh handled after makeMove
+    if(movingPiece == KING) return;
 
-    // remove from start square
-    uint16_t whiteRemove = halfKpIndex(white_king_sq, move.StartSquare, PieceType(movingPiece), side);
-    uint16_t blackRemove = halfKpIndex(black_king_sq, move.StartSquare, PieceType(movingPiece), side);
-    // add piece to target square
-    uint16_t whiteAdd = halfKpIndex(white_king_sq, move.TargetSquare, PieceType(movingPiece), side);
-    uint16_t blackAdd = halfKpIndex(black_king_sq, move.TargetSquare, PieceType(movingPiece), side);
-    // remove from target square
+    uint16_t whiteRemove    = halfKpIndex(white_king_sq, move.StartSquare,  PieceType(movingPiece), side);
+    uint16_t blackRemove    = halfKpIndex(black_king_sq, move.StartSquare,  PieceType(movingPiece), side);
+    uint16_t whiteAdd       = halfKpIndex(white_king_sq, move.TargetSquare, PieceType(movingPiece), side);
+    uint16_t blackAdd       = halfKpIndex(black_king_sq, move.TargetSquare, PieceType(movingPiece), side);
     uint16_t oppWhiteRemove = halfKpIndex(white_king_sq, move.TargetSquare, move.captured, opp);
-    uint16_t oppBlackRemove = halfKpIndex(black_king_sq, move.TargetSquare, move.captured, opp);    
-    // add promoted piece on target piece
-    uint16_t promoWhiteAdd = halfKpIndex(white_king_sq, move.TargetSquare, move.promoted, side);
-    uint16_t promoBlackAdd = halfKpIndex(black_king_sq, move.TargetSquare, move.promoted, side); 
-    // remove pawn from enpassant square
-    uint16_t enWhiteRemove = halfKpIndex(white_king_sq, epCaptureSquare, PAWN, opp);
-    uint16_t enBlackRemove = halfKpIndex(black_king_sq, epCaptureSquare, PAWN, opp);     
+    uint16_t oppBlackRemove = halfKpIndex(black_king_sq, move.TargetSquare, move.captured, opp);
+    uint16_t promoWhiteAdd  = halfKpIndex(white_king_sq, move.TargetSquare, move.promoted, side);
+    uint16_t promoBlackAdd  = halfKpIndex(black_king_sq, move.TargetSquare, move.promoted, side);
+    uint16_t enWhiteRemove  = halfKpIndex(white_king_sq, epCaptureSquare,   PAWN, opp);
+    uint16_t enBlackRemove  = halfKpIndex(black_king_sq, epCaptureSquare,   PAWN, opp);
 
+    bool isCapture   = move.captured != NONE;
+    bool isPromotion = move.promoted != NONE;
+    bool isEP        = move.isEnpassant;
 
-    // remove from start square
     for(int i = 0; i < H1_SIZE; i++){
-        accStack[ply+1].whiteValues[i] -= net.featureT_weights[whiteRemove][i];
-        accStack[ply+1].blackValues[i] -= net.featureT_weights[blackRemove][i];
-    }
-    // add to target square
-    for(int i = 0; i < H1_SIZE; i++){
-        accStack[ply+1].whiteValues[i] += net.featureT_weights[whiteAdd][i];
-        accStack[ply+1].blackValues[i] += net.featureT_weights[blackAdd][i];
-    }
-    // remove the opp captured piece from target square
-    if(move.captured != NONE){
-        for(int i = 0; i < H1_SIZE; i++){
-            accStack[ply+1].whiteValues[i] -= net.featureT_weights[oppWhiteRemove][i];
-            accStack[ply+1].blackValues[i] -= net.featureT_weights[oppBlackRemove][i];    
+        int16_t w = accStack[ply].whiteValues[i];
+        int16_t b = accStack[ply].blackValues[i];
+
+        //move piece from start to target
+        w -= net.featureT_weights[whiteRemove][i];
+        b -= net.featureT_weights[blackRemove][i];
+        w += net.featureT_weights[whiteAdd][i];
+        b += net.featureT_weights[blackAdd][i];
+
+        // captures ,remove opponent piece from target
+        if(isCapture && !isEP){
+            w -= net.featureT_weights[oppWhiteRemove][i];
+            b -= net.featureT_weights[oppBlackRemove][i];
         }
-    }
-    //promotions
-    if(move.promoted != NONE){
-        // remove pawn from target square (undo the whiteAdd above)
-        for(int i = 0; i < H1_SIZE; i++){
-            accStack[ply+1].whiteValues[i] -= net.featureT_weights[whiteAdd][i];
-            accStack[ply+1].blackValues[i] -= net.featureT_weights[blackAdd][i];
+
+        // promotion
+        if(isPromotion){
+            // remove the pawn
+            w -= net.featureT_weights[whiteAdd][i];
+            b -= net.featureT_weights[blackAdd][i];
+            // add the promotion piece
+            w += net.featureT_weights[promoWhiteAdd][i];
+            b += net.featureT_weights[promoBlackAdd][i];
         }
-        // add promoted piece
-        for(int i = 0; i < H1_SIZE; i++){
-            accStack[ply+1].whiteValues[i] += net.featureT_weights[promoWhiteAdd][i];
-            accStack[ply+1].blackValues[i] += net.featureT_weights[promoBlackAdd][i];
+
+        // en passant, remove captured pawn from ep square
+        if(isEP){
+            w -= net.featureT_weights[enWhiteRemove][i];
+            b -= net.featureT_weights[enBlackRemove][i];
         }
-    }
-    //enpassant
-    if(move.isEnpassant){
-        for(int i = 0; i < H1_SIZE; i++){
-            accStack[ply+1].whiteValues[i] -= net.featureT_weights[enWhiteRemove][i];
-            accStack[ply+1].blackValues[i] -= net.featureT_weights[enBlackRemove][i];    
-        }  
+
+        accStack[ply+1].whiteValues[i] = w;
+        accStack[ply+1].blackValues[i] = b;
     }
 }

@@ -166,20 +166,21 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
         int R = 3 + depthleft / 4;
         if (depthleft - 1 - R > 0) {  // only null move if reduced depth stays above 0
             NullMoveUndo undo = makeNullMove(board);
+            accStack[ply + 1] = accStack[ply];
             int nullScore = -alphaBeta(board, -beta, -beta + 1, depthleft - 1 - R, ply + 1);
             unmakeNullMove(board, undo);
             if (stopSearch.load()) return 0;
             if (nullScore >= beta) return beta;
         }
     }
-// Futility pruning — skip moves that can't possibly raise alpha
-    bool fPrune = false;
-    int fMargin[4] = {0, 80, 160, 250};
-    if (depthleft <= 3 && !inCheck && abs(alpha) < 9000) {
-        int staticEval = nnueEval(board, ply);
-        if (staticEval + fMargin[depthleft] <= alpha)
-            fPrune = true;
-    }
+// // Futility pruning — skip moves that can't possibly raise alpha
+//     bool fPrune = false;
+//     int fMargin[4] = {0, 80, 160, 250};
+//     if (depthleft <= 3 && !inCheck && abs(alpha) < 9000) {
+//         int staticEval = nnueEval(board, ply);
+//         if (staticEval + fMargin[depthleft] <= alpha)
+//             fPrune = true;
+//     }
 
     MoveList allMoves = generateLegalMoves(board);
     orderMoves(board, allMoves, bestMove, ply);
@@ -195,9 +196,9 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
         Move current_move = allMoves.moves[i];
         bool wasCapture = (getCaptured(board, (board.sideToMove == WHITE ? BLACK : WHITE), current_move.TargetSquare) != NONE);
 
-        // futility pruning — skip BEFORE makeMove
-        if (fPrune && i > 0 && !wasCapture && current_move.promoted == NONE)
-            continue;
+        // // futility pruning — skip BEFORE makeMove
+        // if (fPrune && i > 0 && !wasCapture && current_move.promoted == NONE)
+        //     continue;
 
         makeMove(board, current_move, ply);
 

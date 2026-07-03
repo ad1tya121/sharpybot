@@ -2,7 +2,7 @@
 #include "board.h"
 
 enum GenMode { all, onlyCaptures };
-void makeMove(Board& board, Move& move, int ply = 0);
+void makeMove(Board& board, Move& move, int ply = 0, bool updateNNUE = true);
 void unMakeMove(Board& board, Move& move);
 MoveList generateLegalMoves(Board& board, GenMode mode = all);
 bool isKingInCheck(Board& board, Color side);

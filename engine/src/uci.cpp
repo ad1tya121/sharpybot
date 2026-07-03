@@ -111,40 +111,17 @@ Move findBestMove(Board& b, int maxDepth) {
     best = rootMoves.moves[0];
 
     initAccumulator(b, accStack[0]);
-    int prevScore = 0;
+
 
     for (int depth = 1; depth <= maxDepth; depth++) {
+        long long nodesAtStart = nodeCount;
+        long long timeAtStart  = elapsed();
         if (stopSearch.load()) break;
 
-        int score;
-
-        if (depth <= 5) {
-            // full window for shallow depths — aspiration unreliable here
-            score = alphaBeta(b, -INF, INF, depth, 0);
-        } else {
-            int delta = 40;
-            int alpha = prevScore - delta;
-            int beta  = prevScore + delta;
-
-            while (true) {
-                score = alphaBeta(b, alpha, beta, depth, 0);
-                if (stopSearch.load()) break;
-
-                if (score <= alpha) {
-                    alpha -= delta;
-                    delta *= 2;
-                } else if (score >= beta) {
-                    beta += delta;
-                    delta *= 2;
-                } else {
-                    break;
-                }
-            }
-        }
+        int score = alphaBeta(b, -INF, INF, depth, 0);
 
         if (stopSearch.load()) break; // discard partial result
 
-        prevScore = score;
 
         for (int i = 1; i < rootMoves.count; i++) {
             if (rootMoves.moves[i] == best) {
@@ -158,16 +135,18 @@ Move findBestMove(Board& b, int maxDepth) {
         if (TT.probeHash(b.hash, depth, dummy, -INF, INF, ttMove))
             best = ttMove;
 
-        long long ms  = elapsed();
-        long long nps = ms > 0 ? (nodeCount * 1000 / ms) : nodeCount;
+        long long ms         = elapsed();
+        long long depthMs    = ms - timeAtStart;      // ← time THIS depth only
+        long long depthNodes = nodeCount - nodesAtStart;
+        long long nps        = depthMs > 0 ? (depthNodes * 1000 / depthMs) : depthNodes;
 
         std::cout << "info depth " << depth
-                  << " score cp "  << score
-                  << " nodes "     << nodeCount
-                  << " nps "       << nps
-                  << " time "      << ms
-                  << " pv "        << moveToString(best)
-                  << std::endl;
+                << " score cp "  << score
+                << " nodes "     << nodeCount
+                << " nps "       << nps              
+                << " time "      << ms               
+                << " pv "        << moveToString(best)
+                << std::endl;
     }
 
     return best;
@@ -290,7 +269,7 @@ void loop() {
     loadStartPosition(board);
     handleNewGame();
 
-    if (!loadNetwork("D:/shinchess/model.bin")) {
+    if (!loadNetwork("model.bin")) {
         std::cerr << "Failed to load NNUE network" << std::endl;
     }
 

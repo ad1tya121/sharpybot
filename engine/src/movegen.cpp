@@ -8,8 +8,10 @@
 #include <iostream>
 
 
-void makeMove(Board& board, Move& move, int ply){
-    updateAccumulator(board, ply, move);
+void makeMove(Board& board, Move& move, int ply, bool updateNNUE){
+
+    if (updateNNUE)
+        updateAccumulator(board, ply, move);
     // saving stats for undo
     board.history[board.historyIdx++] = {
         board.castlingRights,
@@ -108,7 +110,7 @@ void makeMove(Board& board, Move& move, int ply){
     board.updateOccupancy();
 
     // accumulator init for moving piece king
-    if(movingPiece == KING)
+    if (updateNNUE && movingPiece == KING)
         initAccumulator(board, accStack[ply + 1]);
     
 
@@ -421,7 +423,7 @@ MoveList generateLegalMoves(Board& board, GenMode mode){
 
         if(mode == onlyCaptures && MoveToVerify.captured == NONE && MoveToVerify.promoted == NONE && !MoveToVerify.isEnpassant) continue;
 
-        makeMove(board, MoveToVerify);
+        makeMove(board, MoveToVerify, 0, false);
         bool inCheck = isKingInCheck(board, side);
         unMakeMove(board, MoveToVerify);
 
