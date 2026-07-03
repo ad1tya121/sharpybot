@@ -250,8 +250,6 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
         }
 
         unMakeMove(board, current_move);
-
-        if (stopSearch.load()) return 0;
         
         if(score > best_value) {
             best_value = score;
