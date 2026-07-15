@@ -12,17 +12,15 @@
 #include <atomic>
 
 namespace uci {
-    
-    using clock = std::chrono::steady_clock;
-    clock::time_point searchStart;
-    clock::time_point searchEnd;
-    bool useTimer = false;
+
+using clock = std::chrono::steady_clock;
+clock::time_point searchStart;
+clock::time_point hardDeadline;
 
 namespace {
 
 Board board;
 constexpr int INF = 1'000'000;
-std::atomic<int> searchId{0};
 
 
 long long elapsed() {
@@ -52,7 +50,7 @@ PieceType promoFromLetter(char c) {
     }
 }
 
-} // anonymous namespace
+}
 
 // ── square / move strings ────────────────────────────────────────────────────
 
@@ -101,11 +99,19 @@ bool parseMove(Board& b, const std::string& uciMoveStr, Move& outMove) {
 
 // ── search ───────────────────────────────────────────────────────────────────
 
-Move findBestMove(Board& b, int maxDepth) {
+Move findBestMove(Board& b, int maxDepth, long long softMs, long long hardMs) {
     searchStart = clock::now();
     stopSearch  = false;
     clearSearchTables();
     nodeCount = 0;
+
+    clock::time_point softDeadline = (softMs > 0)
+        ? searchStart + std::chrono::milliseconds(softMs)
+        : clock::time_point::max();
+ 
+    hardDeadline = (hardMs > 0)
+        ? searchStart + std::chrono::milliseconds(hardMs)
+        : clock::time_point::max();
 
     Move best{};
     MoveList rootMoves = generateLegalMoves(b);
@@ -116,20 +122,15 @@ Move findBestMove(Board& b, int maxDepth) {
 
 
     for (int depth = 1; depth <= maxDepth; depth++) {
-
-        // Only abort due to time if we are actually using the timer
-        if (useTimer && clock::now() >= searchEnd) {
-            stopSearch = true;
-        }
+        if (clock::now() >= softDeadline) break;
         if (stopSearch.load()) break;
-    
+ 
         long long nodesAtStart = nodeCount;
         long long timeAtStart  = elapsed();
-
+ 
         int score = alphaBeta(b, -INF, INF, depth, 0);
-
+ 
         if (stopSearch.load()) break; // discard partial result
-
 
         for (int i = 1; i < rootMoves.count; i++) {
             if (rootMoves.moves[i] == best) {
@@ -144,7 +145,7 @@ Move findBestMove(Board& b, int maxDepth) {
             best = ttMove;
 
         long long ms         = elapsed();
-        long long depthMs    = ms - timeAtStart;      // ← time THIS depth only
+        long long depthMs    = ms - timeAtStart;
         long long depthNodes = nodeCount - nodesAtStart;
         long long nps        = depthMs > 0 ? (depthNodes * 1000 / depthMs) : depthNodes;
 
@@ -225,36 +226,41 @@ void handleGo(std::istringstream& iss) {
         else if (token == "winc")      iss >> winc;
         else if (token == "binc")      iss >> binc;
         else if (token == "movestogo") iss >> movestogo;
-        // "infinite" → allocatedMs stays -1, no timer
+        // "infinite" → softMs/hardMs stays -1, no timer
     }
 
-    long long allocatedMs = -1;
+    long long softMs = -1;
+    long long hardMs = -1;
 
     if (movetime > 0) {
-        allocatedMs = movetime;
+        hardMs = std::max(movetime - 30, 10LL);
+        softMs = hardMs;
     } else if (wtime >= 0 || btime >= 0) {
         long long myTime = (board.sideToMove == WHITE) ? wtime : btime;
         long long myInc  = (board.sideToMove == WHITE) ? winc  : binc;
         if (myTime < 0) myTime = 0;
-
+ 
         int movesLeft = (movestogo > 0) ? movestogo : 40;
-        allocatedMs = (myTime / movesLeft) + (myInc / 2);
-        allocatedMs = std::min(allocatedMs, myTime / 2); // never burn more than half
-        allocatedMs = std::max(allocatedMs, 10LL);
+        long long base = (myTime / movesLeft) + (myInc / 2);
+ 
+        softMs = base;
+        hardMs = std::min(myTime / 2, base * 4);
+        hardMs -= 30; // safety buffer applied to hard limit only
+ 
+        softMs = std::max(softMs, 10LL);
+        hardMs = std::max(hardMs, 10LL);
     }
-
+    // depth-only or infinite → softMs/hardMs stay -1, no limit applied
+ 
     stopSearch = false;
-
-    if (allocatedMs > 0) {
-        searchEnd = searchStart + std::chrono::milliseconds(allocatedMs);
-        useTimer = true;  
-    } else {
-        searchEnd = searchStart; // Reset it so 'searchEnd != searchStart' checks fail safely
-        useTimer = false; 
-    }
     
-    Move best = findBestMove(board, depth < 0 ? 64 : depth);
-    std::cout << "bestmove " << moveToString(best) << std::endl;
+    Move best = findBestMove(board, depth < 0 ? 64 : depth, softMs, hardMs);
+    
+    if (best.StartSquare == -1) {
+        std::cout << "bestmove 0000" << std::endl;
+    } else {
+        std::cout << "bestmove " << moveToString(best) << std::endl;
+    }
 }
 
 void handleNewGame() {
@@ -262,7 +268,6 @@ void handleNewGame() {
     TT.clear();
     clearSearchTables();
     nodeCount = 0;
-    ++searchId; // invalidate any lingering timer thread
 }
 
 } // anonymous namespace
@@ -290,6 +295,7 @@ void loop() {
         else if (cmd == "ucinewgame") handleNewGame();
         else if (cmd == "position")   handlePosition(iss);
         else if (cmd == "go")         handleGo(iss);
+        else if (cmd == "stop")       stopSearch = true;
         else if (cmd == "quit")       break;
     }
 }

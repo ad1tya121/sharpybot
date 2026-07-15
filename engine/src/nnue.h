@@ -8,7 +8,7 @@ constexpr int H1_SIZE = 256;
 constexpr int H2_SIZE = 32;
 constexpr int H3_SIZE = 32;
 constexpr int SCALE = 64;
-constexpr float OUT_SCALE = 600.0f;
+constexpr float OUT_SCALE = 400.0f;
 
 struct Network {
     // feature transformer weights and biases
@@ -38,4 +38,4 @@ void initAccumulator(const Board& board, Accumulator& acc);
 int32_t nnueEval(const Board& board, int ply);
 bool loadNetwork(const char* path);
 void updateAccumulator(const Board& board, int ply, Move move);
-int32_t CReLU(int16_t value, int16_t min, int16_t max);
+int32_t CReLU(int32_t value, int32_t min, int32_t max);

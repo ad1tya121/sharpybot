@@ -14,8 +14,7 @@
 namespace uci {
     using clock = std::chrono::steady_clock;
     extern clock::time_point searchStart;
-    extern clock::time_point searchEnd;
-    extern bool useTimer;
+    extern clock::time_point hardDeadline;
 }
 
 std::atomic<bool> stopSearch{false};
@@ -115,14 +114,12 @@ void orderMoves(Board& board, MoveList& moves, Move ttBestMove, int ply){
 }
 
 int quiescence(Board& board, int alpha, int beta, int ply){
-    // 1. Increment the master node counter
     nodeCount++;
-    
     if ((nodeCount & 2047) == 0) {
-            if (uci::useTimer && uci::clock::now() >= uci::searchEnd) {
-                stopSearch = true;
-            }
+        if (uci::clock::now() >= uci::hardDeadline) {
+            stopSearch = true;
         }
+    }
     if (stopSearch.load()) return 0;
     bool inCheck = isKingInCheck(board, board.sideToMove);
     int best_value = -infinity;
@@ -152,8 +149,6 @@ int quiescence(Board& board, int alpha, int beta, int ply){
         makeMove(board, move_in_qmoves, ply);
         int score = -quiescence(board, -beta, -alpha, ply + 1);
         unMakeMove(board, move_in_qmoves);
-
-        if (stopSearch.load()) return 0;
         
         if(score >= beta) return score;
         if(score > best_value) best_value = score;
@@ -166,11 +161,8 @@ int quiescence(Board& board, int alpha, int beta, int ply){
 
 int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
     nodeCount++;
-
     if ((nodeCount & 2047) == 0) {
-        if (uci::useTimer && uci::clock::now() >= uci::searchEnd) {
-            stopSearch = true;
-        }
+        if (uci::clock::now() >= uci::hardDeadline) {stopSearch = true;}
     }
     if (stopSearch.load()) return 0;
 
@@ -198,14 +190,6 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
             if (nullScore >= beta) return beta;
         }
     }
-// // Futility pruning — skip moves that can't possibly raise alpha
-//     bool fPrune = false;
-//     int fMargin[4] = {0, 80, 160, 250};
-//     if (depthleft <= 3 && !inCheck && abs(alpha) < 9000) {
-//         int staticEval = nnueEval(board, ply);
-//         if (staticEval + fMargin[depthleft] <= alpha)
-//             fPrune = true;
-//     }
 
     MoveList allMoves = generateLegalMoves(board);
     orderMoves(board, allMoves, bestMove, ply);
@@ -220,10 +204,6 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
     for (int i = 0; i < allMoves.count; i++) {
         Move current_move = allMoves.moves[i];
         bool wasCapture = (getCaptured(board, (board.sideToMove == WHITE ? BLACK : WHITE), current_move.TargetSquare) != NONE);
-
-        // // futility pruning — skip BEFORE makeMove
-        // if (fPrune && i > 0 && !wasCapture && current_move.promoted == NONE)
-        //     continue;
 
         makeMove(board, current_move, ply);
 
