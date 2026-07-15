@@ -7,7 +7,7 @@ import math
 import os
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-loss = nn.MSELoss()
+loss = nn.BCEWithLogitsLoss()
 
 if __name__ == '__main__':
     model = NNUE().to(device)
@@ -19,25 +19,25 @@ if __name__ == '__main__':
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
 
-    dataset = ChessDataset(r"./lichess_db_eval.jsonl.zst", max_positions=3000000)
+    dataset = ChessDataset(r"./lichess-evals")
     dataloader = DataLoader(dataset=dataset, batch_size=1024, shuffle=True, num_workers=2)
 
     # training loop
     num_epoch = 40
     for epoch in range(num_epoch):
-        for white_values, black_values, score in dataloader:
-            white_values = white_values.to(device)
-            black_values = black_values.to(device)
+        for us_values, them_values, score in dataloader:
+            us_values = us_values.to(device)
+            them_values = them_values.to(device)
             score = score.to(device)
 
             #zero gradiants
             optimizer.zero_grad()
 
             #forward pass
-            score_pred = model(white_values, black_values)
+            score_pred = model(us_values, them_values)
 
             #loss 
-            l = loss(score, score_pred)
+            l = loss(score_pred, score)
 
             # gradiants
             l.backward()

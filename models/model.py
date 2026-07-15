@@ -10,9 +10,9 @@ class NNUE(nn.Module):
         self.l2 = nn.Linear(32, 32)     # hidden layer 2
         self.l3 = nn.Linear(32, 1)      # output
 
-    def forward(self, white_features, black_features):
-        w = torch.clamp(self.ft(white_features), 0, 1)
-        b = torch.clamp(self.ft(black_features), 0, 1)
+    def forward(self, us_features, them_features):
+        w = torch.clamp(self.ft(us_features), 0, 1)
+        b = torch.clamp(self.ft(them_features), 0, 1)
 
         features = torch.cat([w, b], dim=1)
 

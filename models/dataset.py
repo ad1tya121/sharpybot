@@ -1,9 +1,17 @@
 import torch
 import numpy as np
+import pandas as pd
 from torch.utils.data import Dataset
-import zstandard as zstd
-import json
-import io
+import os
+import glob
+
+def parse_eval(raw) -> int:
+    raw = str(raw).strip()
+    if raw.startswith('#'):
+        mate_num = int(raw[1:])
+        mate_cp = 10000
+        return mate_cp if mate_num > 0 else -mate_cp
+    return int(raw)
 
 def parse_fen(fen: str):
     parts = fen.split(" ")
@@ -33,33 +41,41 @@ def parse_fen(fen: str):
 def get_halfKp_indices(pieces, white_king, black_king):
     white_indices = []
     black_indices = []
+
+    mirrored_black_king = black_king ^ 56  # flip rank for black's perspective
+
     for sq, (pt, color) in pieces.items():
         if pt == 5:
             continue
-        p_idx = pt * 2 + color
-        white_index = sq + (p_idx + white_king * 10) * 64
-        black_index = sq + (p_idx + black_king * 10) * 64
+
+        # White perspective (unchanged)
+        p_idx_white = pt * 2 + color
+        white_index = sq + (p_idx_white + white_king * 10) * 64
         white_indices.append(white_index)
+
+        # Black perspective: mirror square, flip color
+        mirrored_sq = sq ^ 56
+        flipped_color = 1 - color
+        p_idx_black = pt * 2 + flipped_color
+        black_index = mirrored_sq + (p_idx_black + mirrored_black_king * 10) * 64
         black_indices.append(black_index)
+
     return white_indices, black_indices
 
 class ChessDataset(Dataset):
-    def __init__(self, file_path, max_positions=5000000):
+    def __init__(self, file_path, max_positions=None):
         super().__init__()
         self.data = []
         self._load(file_path, max_positions)
 
-    def _load(self, file_path, max_positions):
-        with open(file_path, 'rb') as f:
-            dctx = zstd.ZstdDecompressor()
-            reader = dctx.stream_reader(f)
-            text_reader = io.TextIOWrapper(reader, encoding='utf-8')
-            for line in text_reader:
-                data = json.loads(line)
-                fen = data['fen']
+    def _load(self, file_path, max_positions=None):
+        csv_files = glob.glob(os.path.join(file_path, "*.csv"))
+        for csv_file in csv_files:
+            df = pd.read_csv(csv_file)
+            for fen, raw_eval in zip(df['FEN'], df['Evaluation']):
                 try:
-                    cp = data['evals'][0]['pvs'][0]['cp']
-                except (KeyError, IndexError):
+                    cp = parse_eval(raw_eval)
+                except ValueError:
                     continue
 
                 # clip extreme scores
@@ -68,18 +84,18 @@ class ChessDataset(Dataset):
                 pieces, side, white_king, black_king = parse_fen(fen)
                 w_idx, b_idx = get_halfKp_indices(pieces, white_king, black_king)
 
-                # flip score for black to move
-                score = cp / 600.0 if side == 0 else -cp / 600.0
+                mover_relative_cp = cp if side == 0 else -cp
+                score = 1.0 / (1.0 + np.exp(-mover_relative_cp / 400.0))
 
-                self.data.append((w_idx, b_idx, score))
-                if len(self.data) >= max_positions:
-                    break
+                self.data.append((w_idx, b_idx, side, score))                
+                if max_positions and len(self.data) >= max_positions:
+                    return
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
-        w_idx, b_idx, score = self.data[index]
+        w_idx, b_idx, side, score = self.data[index]
 
         white_tensor = torch.zeros(40960)
         black_tensor = torch.zeros(40960)
@@ -87,4 +103,9 @@ class ChessDataset(Dataset):
         if w_idx: white_tensor[w_idx] = 1.0
         if b_idx: black_tensor[b_idx] = 1.0
 
-        return white_tensor, black_tensor, torch.tensor([score], dtype=torch.float32)
+        if side == 0:  # white to move → us=white, them=black
+            us_tensor, them_tensor = white_tensor, black_tensor
+        else:          # black to move → us=black, them=white
+            us_tensor, them_tensor = black_tensor, white_tensor
+
+        return us_tensor, them_tensor, torch.tensor([score], dtype=torch.float32)
