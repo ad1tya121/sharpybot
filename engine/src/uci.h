@@ -10,5 +10,5 @@ namespace uci {
     std::string squareToString(int sq);
     std::string moveToString(const Move& move);
     bool parseMove(Board& b, const std::string& uciMoveStr, Move& outMove);
-    Move findBestMove(Board& b, int maxDepth);
+    Move findBestMove(Board& b, int maxDepth, long long softMs, long long hardMs);
 }

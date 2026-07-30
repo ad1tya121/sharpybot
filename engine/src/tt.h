@@ -18,7 +18,7 @@ private:
     size_t no_of_entries;
 public:
     TranspositionTable(size_t megabytes);
-    bool probeHash(U64 hashKey, int depth, int& score, int alpha, int beta, Move& bestMove);
+    bool probeHash(U64 hashKey, int depth, int& score, int alpha, int beta, Move& bestMove, int ply);
     void storeHash(U64 hashKey, int depth, int score, uint8_t flag, Move bestMove);
     void clear();
     ~TranspositionTable();

@@ -16,6 +16,7 @@ enum squareIndex {
                     A8, B8, C8, D8, E8, F8, G8, H8 };
 enum Color {WHITE, BLACK};
 enum PieceType {NONE = -1, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
+constexpr int SEE_VALUE[6] = {100, 320, 330, 500, 900, 20000};
 // enum NNUEPieceType {PAWN, KNIGHT, BISHOP, ROOK, QUEEN};
 
 constexpr U64  getBit  (U64 bb, int sq)  { return bb & (1ULL << sq); }

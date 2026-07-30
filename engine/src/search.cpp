@@ -6,6 +6,7 @@
 #include "tt.h"
 #include "uci.h"
 #include "nnue.h"
+#include "see.h"
 #include <iostream>
 #include <cstring>
 #include <cmath>
@@ -28,6 +29,9 @@ void clearSearchTables() {
     memset(history_moves, 0, sizeof(history_moves));
 }
 
+// ------------------------------------------------------------------------------------------------
+// --------------------------------MOVE ORDERING---------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 void orderMoves(Board& board, MoveList& moves, Move ttBestMove, int ply){
     int scores[256] = {0}; 
     
@@ -112,7 +116,9 @@ void orderMoves(Board& board, MoveList& moves, Move ttBestMove, int ply){
         }
     }
 }
-
+// ------------------------------------------------------------------------------------------------
+// --------------------------------QUIESCENCE SEARCH-----------------------------------------------
+// ------------------------------------------------------------------------------------------------
 int quiescence(Board& board, int alpha, int beta, int ply){
     nodeCount++;
     if ((nodeCount & 2047) == 0) {
@@ -126,7 +132,7 @@ int quiescence(Board& board, int alpha, int beta, int ply){
 
     if(!inCheck){
         // Stand Pat
-        int static_eval = nnueEval(board, ply);                      
+        int static_eval = nnueEval(board, ply);
         best_value = static_eval;
         if( best_value >= beta )
             return best_value;
@@ -146,9 +152,20 @@ int quiescence(Board& board, int alpha, int beta, int ply){
     for(int i = 0; i < qmoves.count; i++){
         Move move_in_qmoves = qmoves.moves[i];
 
+        if (!seeGE(board, move_in_qmoves, 0)) continue;
+
+        // DELTA PRUNING
+        if (!inCheck && board.gamePhase > 4) {
+            int capturedValue = SEE_VALUE[getCaptured(board, 
+                (board.sideToMove == WHITE ? BLACK : WHITE), move_in_qmoves.TargetSquare)];
+            int deltaMargin = 200; // safety buffer for positional factors
+            if (best_value + capturedValue + deltaMargin < alpha) continue;
+        }
+
         makeMove(board, move_in_qmoves, ply);
         int score = -quiescence(board, -beta, -alpha, ply + 1);
         unMakeMove(board, move_in_qmoves);
+        if (stopSearch.load()) return 0;
         
         if(score >= beta) return score;
         if(score > best_value) best_value = score;
@@ -157,9 +174,10 @@ int quiescence(Board& board, int alpha, int beta, int ply){
 
     return best_value;
 }
-
-
-int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
+// ------------------------------------------------------------------------------------------------
+// --------------------------------ALPHA BETA PRUNING-----------------------------------------------
+// ------------------------------------------------------------------------------------------------
+int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply, Move& outBestMove){
     nodeCount++;
     if ((nodeCount & 2047) == 0) {
         if (uci::clock::now() >= uci::hardDeadline) {stopSearch = true;}
@@ -172,8 +190,9 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
     Move bestMove{};
 // TT Lookup
     int ttscore;
-    if (TT.probeHash(board.hash, depthleft, ttscore, alpha, beta, bestMove)) {
-        return scoreFromTT(ttscore, ply);
+    if (TT.probeHash(board.hash, depthleft, ttscore, alpha, beta, bestMove, ply)) {
+        outBestMove = bestMove;
+        return ttscore;
     }
 
     if (depthleft == 0) return quiescence(board, alpha, beta, ply);
@@ -181,13 +200,22 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
 // NULL MOVE PRUNING
     if (!inCheck && depthleft >= 3 && ply > 0 && hasNonPawnMaterial(board, board.sideToMove)) {
         int R = 3 + depthleft / 4;
-        if (depthleft - 1 - R > 0) {  // only null move if reduced depth stays above 0
+        if (depthleft - 1 - R > 0) {
             NullMoveUndo undo = makeNullMove(board);
             accStack[ply + 1] = accStack[ply];
-            int nullScore = -alphaBeta(board, -beta, -beta + 1, depthleft - 1 - R, ply + 1);
+            Move nullDummy{};
+            int nullScore = -alphaBeta(board, -beta, -beta + 1, depthleft - 1 - R, ply + 1, nullDummy);
             unmakeNullMove(board, undo);
             if (stopSearch.load()) return 0;
             if (nullScore >= beta) return beta;
+        }
+    }
+// REVERSE FUTILITY PRUNING (static null move pruning)
+    if (!inCheck && depthleft <= 6 && ply > 0 && std::abs(beta) < mateScore - 256) {
+        int staticEval = nnueEval(board, ply);
+        int margin = 90 * depthleft; // tune this constant later
+        if (staticEval - margin >= beta) {
+            return staticEval - margin;
         }
     }
 
@@ -198,39 +226,44 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
         if (inCheck) return -mateScore + ply;
         return 0;
     }
-    
-    int best_value = -infinity; 
+
+    int best_value = -infinity;
 
     for (int i = 0; i < allMoves.count; i++) {
         Move current_move = allMoves.moves[i];
         bool wasCapture = (getCaptured(board, (board.sideToMove == WHITE ? BLACK : WHITE), current_move.TargetSquare) != NONE);
 
+        if (wasCapture && depthleft <= 6 && !inCheck && i > 0) {
+            int seeMargin = -depthleft * 90;
+            if (!seeGE(board, current_move, seeMargin)) continue;
+        }
+
         makeMove(board, current_move, ply);
 
         int score;
+        Move childBest{};
         if (i == 0) {
-            // first move — full window
-            score = -alphaBeta(board, -beta, -alpha, depthleft - 1, ply + 1);} 
+            score = -alphaBeta(board, -beta, -alpha, depthleft - 1, ply + 1, childBest);
+        }
         else if (i >= 2 && depthleft >= 3 && !inCheck &&
                 !wasCapture && current_move.promoted == NONE &&
-                current_move != killer_moves[0][ply]) {
+                current_move != killer_moves[0][ply] &&
+                current_move != killer_moves[1][ply]) {
 
-                // LMR
                 int R = 1 + (int)(log(depthleft) * log(i) / 2.0);
                 R = std::max(1, std::min(R, depthleft - 1));
-                score = -alphaBeta(board, -alpha - 1, -alpha, depthleft - 1 - R, ply + 1);
+                score = -alphaBeta(board, -alpha - 1, -alpha, depthleft - 1 - R, ply + 1, childBest);
                 if (score > alpha && score < beta)
-                    score = -alphaBeta(board, -beta, -alpha, depthleft - 1, ply + 1);
+                    score = -alphaBeta(board, -beta, -alpha, depthleft - 1, ply + 1, childBest);
         } else {
-
-            // PVS null window for all other moves
-            score = -alphaBeta(board, -alpha - 1, -alpha, depthleft - 1, ply + 1);
+            score = -alphaBeta(board, -alpha - 1, -alpha, depthleft - 1, ply + 1, childBest);
             if (score > alpha && score < beta)
-                score = -alphaBeta(board, -beta, -alpha, depthleft - 1, ply + 1);
+                score = -alphaBeta(board, -beta, -alpha, depthleft - 1, ply + 1, childBest);
         }
 
         unMakeMove(board, current_move);
-        
+        if (stopSearch.load()) return 0;
+
         if(score > best_value) {
             best_value = score;
             bestMove = current_move;
@@ -240,15 +273,11 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
             if (!stopSearch.load())
                 TT.storeHash(board.hash, depthleft, scoreToTT(score, ply), HASH_BETA, current_move);
 
-    // killer/history update — quiet moves only
         if (!wasCapture && current_move.promoted == NONE) {
-            // killer moves
             if (current_move != killer_moves[0][ply]) {
                 killer_moves[1][ply] = killer_moves[0][ply];
                 killer_moves[0][ply] = current_move;
             }
-
-            // history moves
             int movePieceType = PAWN;
             for (int p = 0; p < 6; p++){
                 if (getBit(board.pieces[board.sideToMove][p], current_move.StartSquare)) { movePieceType = p; break; }
@@ -262,13 +291,15 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply){
                             history_moves[s][p][sq] /= 2;
             }
         }
-
-            return score;}
+            outBestMove = current_move;
+            return score;
+        }
     }
 
     if (!stopSearch.load()) {
         uint8_t flag = (best_value <= originalAlpha) ? HASH_ALPHA : HASH_EXACT;
         TT.storeHash(board.hash, depthleft, scoreToTT(best_value, ply), flag, bestMove);
     }
+    outBestMove = bestMove;
     return best_value;
 }

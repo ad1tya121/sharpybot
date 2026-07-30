@@ -65,7 +65,7 @@ void TranspositionTable::clear(){
 }
 
 // if this hash is already stored just fetch the info and skip the search
-bool TranspositionTable::probeHash(U64 hashKey, int depth, int& score, int alpha, int beta, Move& bestMove){
+bool TranspositionTable::probeHash(U64 hashKey, int depth, int& score, int alpha, int beta, Move& bestMove, int ply){
     size_t index = hashKey % no_of_entries;
 
     if(TT[index].hashKey == hashKey){
@@ -73,18 +73,18 @@ bool TranspositionTable::probeHash(U64 hashKey, int depth, int& score, int alpha
         bestMove = from_uint16(rawMove);
 
         if(TT[index].depth >= depth){
+            int adjScore = scoreFromTT(TT[index].score, ply);
+
             if (TT[index].flag == HASH_EXACT) {
-                score = TT[index].score;
+                score = adjScore;
                 return true;
             }
-            
-            if (TT[index].flag == HASH_ALPHA && TT[index].score <= alpha) {
-                score = TT[index].score;
+            if (TT[index].flag == HASH_ALPHA && adjScore <= alpha) {
+                score = adjScore;
                 return true;
             }
-            
-            if (TT[index].flag == HASH_BETA && TT[index].score >= beta) {
-                score = TT[index].score;
+            if (TT[index].flag == HASH_BETA && adjScore >= beta) {
+                score = adjScore;
                 return true;
             }
         }

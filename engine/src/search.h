@@ -6,7 +6,7 @@ const int mateScore = 100000;
 const int infinity = 3000000;
 extern long long nodeCount;
 
-int alphaBeta(Board& board, int alpha, int beta, int depth, int ply);
+int alphaBeta(Board& board, int alpha, int beta, int depth, int ply, Move& outBestMove);
 int quiescence(Board& board, int alpha, int beta, int ply);
 void orderMoves(Board& board, MoveList& moves, Move ttBestMove, int ply);
 extern std::atomic<bool> stopSearch;

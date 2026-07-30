@@ -1,4 +1,5 @@
 #include "uci.h"
+#include "exe_path.h"
 #include "board.h"
 #include "movegen.h"
 #include "evaluation.h"
@@ -119,7 +120,8 @@ Move findBestMove(Board& b, int maxDepth, long long softMs, long long hardMs) {
     best = rootMoves.moves[0];
 
     initAccumulator(b, accStack[0]);
-
+    
+    int prevScore = 0;
 
     for (int depth = 1; depth <= maxDepth; depth++) {
         if (clock::now() >= softDeadline) break;
@@ -127,34 +129,58 @@ Move findBestMove(Board& b, int maxDepth, long long softMs, long long hardMs) {
  
         long long nodesAtStart = nodeCount;
         long long timeAtStart  = elapsed();
- 
-        int score = alphaBeta(b, -INF, INF, depth, 0);
- 
-        if (stopSearch.load()) break; // discard partial result
 
-        for (int i = 1; i < rootMoves.count; i++) {
-            if (rootMoves.moves[i] == best) {
-                std::swap(rootMoves.moves[0], rootMoves.moves[i]);
-                break;
+
+        Move rootBest{};
+        int score;
+
+        if (depth <= 4) {
+            score = alphaBeta(b, -INF, INF, depth, 0, rootBest);
+        } else {
+            int window = 25;
+            int alpha = prevScore - window;
+            int beta  = prevScore + window;
+
+            while (true) {
+                score = alphaBeta(b, alpha, beta, depth, 0, rootBest);
+
+                if (stopSearch.load()) break;
+
+                if (score <= alpha) {
+                    beta = (alpha + beta) / 2; // keep beta reasonable, don't let it drift with alpha
+                    alpha = std::max(alpha - window, -INF);
+                    window *= 2;
+                } else if (score >= beta) {
+                    beta = std::min(beta + window, INF);
+                    window *= 2;
+                } else {
+                    break; // landed inside window
+                }
             }
         }
 
-        Move ttMove{};
-        int dummy;
-        if (TT.probeHash(b.hash, depth, dummy, -INF, INF, ttMove))
-            best = ttMove;
+        if (stopSearch.load()) break;
+
+        best = rootBest;
+        prevScore = score;
 
         long long ms         = elapsed();
         long long depthMs    = ms - timeAtStart;
         long long depthNodes = nodeCount - nodesAtStart;
         long long nps        = depthMs > 0 ? (depthNodes * 1000 / depthMs) : depthNodes;
 
-        std::cout << "info depth " << depth
-                << " score cp "  << score
-                << " nodes "     << nodeCount
-                << " nps "       << nps              
-                << " time "      << ms               
-                << " pv "        << moveToString(best)
+        std::cout << "info depth " << depth << " score ";
+        if (std::abs(score) >= mateScore - 1000) {  // near-mate threshold, adjust to your MAX_PLY
+            int pliesToMate = mateScore - std::abs(score);
+            int movesToMate = (pliesToMate + 1) / 2;
+            std::cout << "mate " << (score > 0 ? movesToMate : -movesToMate);
+        } else {
+            std::cout << "cp " << score;
+        }
+        std::cout << " nodes " << nodeCount
+                << " nps "     << nps
+                << " time "    << ms
+                << " pv "      << moveToString(best)
                 << std::endl;
     }
 
@@ -173,10 +199,13 @@ void handleIsReady() {
     std::cout << "readyok" << std::endl;
 }
 
-void handlePosition(std::istringstream& iss) {
-    clearSearchTables(); // killers/history are garbage from previous position
-    nodeCount = 0;
+void handleEval() {
+    initAccumulator(board, accStack[0]);
+    int32_t eval = nnueEval(board, 0);
+    std::cout << "raw eval: " << eval << std::endl;
+}
 
+void handlePosition(std::istringstream& iss) {
     std::string token;
     iss >> token;
 
@@ -244,9 +273,11 @@ void handleGo(std::istringstream& iss) {
         long long base = (myTime / movesLeft) + (myInc / 2);
  
         softMs = base;
-        hardMs = std::min(myTime / 2, base * 4);
+        long long safetyCap = (myTime / 2) + myInc;
+        hardMs = std::min(safetyCap, base * 4);
         hardMs -= 30; // safety buffer applied to hard limit only
- 
+        
+        hardMs = std::max(hardMs, softMs);
         softMs = std::max(softMs, 10LL);
         hardMs = std::max(hardMs, 10LL);
     }
@@ -278,9 +309,12 @@ void loop() {
     loadStartPosition(board);
     handleNewGame();
 
-    if (!loadNetwork("model.bin")) {
-        std::cerr << "Failed to load NNUE network" << std::endl;
+    std::filesystem::path nnuePath = get_exe_dir() / "model.bin";
+    if (!loadNetwork(nnuePath.string().c_str())) {
+        std::cout << "info string NNUE load failed: " << nnuePath << std::endl;
+        std::exit(1);
     }
+    std::cout << "info string NNUE loaded: " << nnuePath << std::endl;
 
     std::string line;
     while (std::getline(std::cin, line)) {
@@ -295,8 +329,10 @@ void loop() {
         else if (cmd == "ucinewgame") handleNewGame();
         else if (cmd == "position")   handlePosition(iss);
         else if (cmd == "go")         handleGo(iss);
+        else if (cmd == "eval") handleEval();
         else if (cmd == "stop")       stopSearch = true;
         else if (cmd == "quit")       break;
+
     }
 }
 
