@@ -242,7 +242,7 @@ public:
     //   Windows: "C:/path/to/stockfish.exe"  or just "stockfish.exe"
     //            if it's on your PATH
     //   Linux:   "/usr/games/stockfish"
-    StockfishBridge(const std::string& stockfishPath = "stockfish", int depth = 12) {
+    StockfishBridge(const std::string& stockfishPath = "./engine/engine.exe", int depth = 12) {
         analysis_depth = depth;
         running = false;
 
