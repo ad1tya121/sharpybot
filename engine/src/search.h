@@ -18,3 +18,5 @@ extern Move killer_moves[2][256];
 extern int history_moves[2][6][64];
 
 void clearSearchTables();
+extern int lmrTable[64][64];
+void initLMR();

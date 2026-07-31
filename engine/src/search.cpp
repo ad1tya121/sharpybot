@@ -23,6 +23,15 @@ long long nodeCount = 0;
 TranspositionTable TT(128);
 Move killer_moves[2][256];
 int history_moves[2][6][64];
+int lmrTable[64][64];
+
+void initLMR() {
+    for (int depth = 1; depth < 64; depth++) {
+        for (int i = 1; i < 64; i++) {
+            lmrTable[depth][i] = (int)(1 + (log(depth) * log(i) / 2.0));
+        }
+    }
+}
 
 void clearSearchTables() {
     memset(killer_moves, 0, sizeof(killer_moves));
@@ -250,7 +259,7 @@ int alphaBeta(Board& board, int alpha, int beta, int depthleft, int ply, Move& o
                 current_move != killer_moves[0][ply] &&
                 current_move != killer_moves[1][ply]) {
 
-                int R = 1 + (int)(log(depthleft) * log(i) / 2.0);
+                int R = lmrTable[std::min(depthleft, 63)][std::min(i, 63)];
                 R = std::max(1, std::min(R, depthleft - 1));
                 score = -alphaBeta(board, -alpha - 1, -alpha, depthleft - 1 - R, ply + 1, childBest);
                 if (score > alpha && score < beta)

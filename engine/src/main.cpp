@@ -18,6 +18,7 @@ int main() {
     initKnightAttacks();
     initKingAttacks();
     initZobrist();
+    initLMR();
     std::ios_base::sync_with_stdio(false);
     std::cin.tie(NULL);
     uci::loop();
