@@ -1,0 +1,4 @@
+.env
+"engine/stockfish.exe" 
+"*.zip" 
+".env" 

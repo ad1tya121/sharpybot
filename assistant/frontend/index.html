@@ -1,0 +1,3011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Oakwood Chess Coach</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#9812;</text></svg>">
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>
+/* chess.js v0.10.3 (jhlywa, BSD license), embedded directly.
+   Newer chess.js releases (including CDN builds tagged 0.13.x) were
+   rewritten in TypeScript/ESM and use top-level `export` statements,
+   which throws "Unexpected token export" when loaded as a plain
+   script tag - that was the root cause of the blank page. This old
+   plain-JS build declares `var Chess = function(...)`, which attaches
+   Chess to window when run as a classic (non-module) script, so it
+   just works with no bundler and no CDN dependency at all. */
+/*
+ * Copyright (c) 2020, Jeff Hlywa (jhlywa@gmail.com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *----------------------------------------------------------------------------*/
+
+/* minified license below  */
+
+/* @license
+ * Copyright (c) 2018, Jeff Hlywa (jhlywa@gmail.com)
+ * Released under the BSD license
+ * https://github.com/jhlywa/chess.js/blob/master/LICENSE
+ */
+
+var Chess = function(fen) {
+  var BLACK = 'b'
+  var WHITE = 'w'
+
+  var EMPTY = -1
+
+  var PAWN = 'p'
+  var KNIGHT = 'n'
+  var BISHOP = 'b'
+  var ROOK = 'r'
+  var QUEEN = 'q'
+  var KING = 'k'
+
+  var SYMBOLS = 'pnbrqkPNBRQK'
+
+  var DEFAULT_POSITION =
+    'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
+  var POSSIBLE_RESULTS = ['1-0', '0-1', '1/2-1/2', '*']
+
+  var PAWN_OFFSETS = {
+    b: [16, 32, 17, 15],
+    w: [-16, -32, -17, -15]
+  }
+
+  var PIECE_OFFSETS = {
+    n: [-18, -33, -31, -14, 18, 33, 31, 14],
+    b: [-17, -15, 17, 15],
+    r: [-16, 1, 16, -1],
+    q: [-17, -16, -15, 1, 17, 16, 15, -1],
+    k: [-17, -16, -15, 1, 17, 16, 15, -1]
+  }
+
+  // prettier-ignore
+  var ATTACKS = [
+    20, 0, 0, 0, 0, 0, 0, 24,  0, 0, 0, 0, 0, 0,20, 0,
+     0,20, 0, 0, 0, 0, 0, 24,  0, 0, 0, 0, 0,20, 0, 0,
+     0, 0,20, 0, 0, 0, 0, 24,  0, 0, 0, 0,20, 0, 0, 0,
+     0, 0, 0,20, 0, 0, 0, 24,  0, 0, 0,20, 0, 0, 0, 0,
+     0, 0, 0, 0,20, 0, 0, 24,  0, 0,20, 0, 0, 0, 0, 0,
+     0, 0, 0, 0, 0,20, 2, 24,  2,20, 0, 0, 0, 0, 0, 0,
+     0, 0, 0, 0, 0, 2,53, 56, 53, 2, 0, 0, 0, 0, 0, 0,
+    24,24,24,24,24,24,56,  0, 56,24,24,24,24,24,24, 0,
+     0, 0, 0, 0, 0, 2,53, 56, 53, 2, 0, 0, 0, 0, 0, 0,
+     0, 0, 0, 0, 0,20, 2, 24,  2,20, 0, 0, 0, 0, 0, 0,
+     0, 0, 0, 0,20, 0, 0, 24,  0, 0,20, 0, 0, 0, 0, 0,
+     0, 0, 0,20, 0, 0, 0, 24,  0, 0, 0,20, 0, 0, 0, 0,
+     0, 0,20, 0, 0, 0, 0, 24,  0, 0, 0, 0,20, 0, 0, 0,
+     0,20, 0, 0, 0, 0, 0, 24,  0, 0, 0, 0, 0,20, 0, 0,
+    20, 0, 0, 0, 0, 0, 0, 24,  0, 0, 0, 0, 0, 0,20
+  ];
+
+  // prettier-ignore
+  var RAYS = [
+     17,  0,  0,  0,  0,  0,  0, 16,  0,  0,  0,  0,  0,  0, 15, 0,
+      0, 17,  0,  0,  0,  0,  0, 16,  0,  0,  0,  0,  0, 15,  0, 0,
+      0,  0, 17,  0,  0,  0,  0, 16,  0,  0,  0,  0, 15,  0,  0, 0,
+      0,  0,  0, 17,  0,  0,  0, 16,  0,  0,  0, 15,  0,  0,  0, 0,
+      0,  0,  0,  0, 17,  0,  0, 16,  0,  0, 15,  0,  0,  0,  0, 0,
+      0,  0,  0,  0,  0, 17,  0, 16,  0, 15,  0,  0,  0,  0,  0, 0,
+      0,  0,  0,  0,  0,  0, 17, 16, 15,  0,  0,  0,  0,  0,  0, 0,
+      1,  1,  1,  1,  1,  1,  1,  0, -1, -1,  -1,-1, -1, -1, -1, 0,
+      0,  0,  0,  0,  0,  0,-15,-16,-17,  0,  0,  0,  0,  0,  0, 0,
+      0,  0,  0,  0,  0,-15,  0,-16,  0,-17,  0,  0,  0,  0,  0, 0,
+      0,  0,  0,  0,-15,  0,  0,-16,  0,  0,-17,  0,  0,  0,  0, 0,
+      0,  0,  0,-15,  0,  0,  0,-16,  0,  0,  0,-17,  0,  0,  0, 0,
+      0,  0,-15,  0,  0,  0,  0,-16,  0,  0,  0,  0,-17,  0,  0, 0,
+      0,-15,  0,  0,  0,  0,  0,-16,  0,  0,  0,  0,  0,-17,  0, 0,
+    -15,  0,  0,  0,  0,  0,  0,-16,  0,  0,  0,  0,  0,  0,-17
+  ];
+
+  var SHIFTS = { p: 0, n: 1, b: 2, r: 3, q: 4, k: 5 }
+
+  var FLAGS = {
+    NORMAL: 'n',
+    CAPTURE: 'c',
+    BIG_PAWN: 'b',
+    EP_CAPTURE: 'e',
+    PROMOTION: 'p',
+    KSIDE_CASTLE: 'k',
+    QSIDE_CASTLE: 'q'
+  }
+
+  var BITS = {
+    NORMAL: 1,
+    CAPTURE: 2,
+    BIG_PAWN: 4,
+    EP_CAPTURE: 8,
+    PROMOTION: 16,
+    KSIDE_CASTLE: 32,
+    QSIDE_CASTLE: 64
+  }
+
+  var RANK_1 = 7
+  var RANK_2 = 6
+  var RANK_3 = 5
+  var RANK_4 = 4
+  var RANK_5 = 3
+  var RANK_6 = 2
+  var RANK_7 = 1
+  var RANK_8 = 0
+
+  // prettier-ignore
+  var SQUARES = {
+    a8:   0, b8:   1, c8:   2, d8:   3, e8:   4, f8:   5, g8:   6, h8:   7,
+    a7:  16, b7:  17, c7:  18, d7:  19, e7:  20, f7:  21, g7:  22, h7:  23,
+    a6:  32, b6:  33, c6:  34, d6:  35, e6:  36, f6:  37, g6:  38, h6:  39,
+    a5:  48, b5:  49, c5:  50, d5:  51, e5:  52, f5:  53, g5:  54, h5:  55,
+    a4:  64, b4:  65, c4:  66, d4:  67, e4:  68, f4:  69, g4:  70, h4:  71,
+    a3:  80, b3:  81, c3:  82, d3:  83, e3:  84, f3:  85, g3:  86, h3:  87,
+    a2:  96, b2:  97, c2:  98, d2:  99, e2: 100, f2: 101, g2: 102, h2: 103,
+    a1: 112, b1: 113, c1: 114, d1: 115, e1: 116, f1: 117, g1: 118, h1: 119
+  };
+
+  var ROOKS = {
+    w: [
+      { square: SQUARES.a1, flag: BITS.QSIDE_CASTLE },
+      { square: SQUARES.h1, flag: BITS.KSIDE_CASTLE }
+    ],
+    b: [
+      { square: SQUARES.a8, flag: BITS.QSIDE_CASTLE },
+      { square: SQUARES.h8, flag: BITS.KSIDE_CASTLE }
+    ]
+  }
+
+  var board = new Array(128)
+  var kings = { w: EMPTY, b: EMPTY }
+  var turn = WHITE
+  var castling = { w: 0, b: 0 }
+  var ep_square = EMPTY
+  var half_moves = 0
+  var move_number = 1
+  var history = []
+  var header = {}
+
+  /* if the user passes in a fen string, load it, else default to
+   * starting position
+   */
+  if (typeof fen === 'undefined') {
+    load(DEFAULT_POSITION)
+  } else {
+    load(fen)
+  }
+
+  function clear(keep_headers) {
+    if (typeof keep_headers === 'undefined') {
+      keep_headers = false
+    }
+
+    board = new Array(128)
+    kings = { w: EMPTY, b: EMPTY }
+    turn = WHITE
+    castling = { w: 0, b: 0 }
+    ep_square = EMPTY
+    half_moves = 0
+    move_number = 1
+    history = []
+    if (!keep_headers) header = {}
+    update_setup(generate_fen())
+  }
+
+  function reset() {
+    load(DEFAULT_POSITION)
+  }
+
+  function load(fen, keep_headers) {
+    if (typeof keep_headers === 'undefined') {
+      keep_headers = false
+    }
+
+    var tokens = fen.split(/\s+/)
+    var position = tokens[0]
+    var square = 0
+
+    if (!validate_fen(fen).valid) {
+      return false
+    }
+
+    clear(keep_headers)
+
+    for (var i = 0; i < position.length; i++) {
+      var piece = position.charAt(i)
+
+      if (piece === '/') {
+        square += 8
+      } else if (is_digit(piece)) {
+        square += parseInt(piece, 10)
+      } else {
+        var color = piece < 'a' ? WHITE : BLACK
+        put({ type: piece.toLowerCase(), color: color }, algebraic(square))
+        square++
+      }
+    }
+
+    turn = tokens[1]
+
+    if (tokens[2].indexOf('K') > -1) {
+      castling.w |= BITS.KSIDE_CASTLE
+    }
+    if (tokens[2].indexOf('Q') > -1) {
+      castling.w |= BITS.QSIDE_CASTLE
+    }
+    if (tokens[2].indexOf('k') > -1) {
+      castling.b |= BITS.KSIDE_CASTLE
+    }
+    if (tokens[2].indexOf('q') > -1) {
+      castling.b |= BITS.QSIDE_CASTLE
+    }
+
+    ep_square = tokens[3] === '-' ? EMPTY : SQUARES[tokens[3]]
+    half_moves = parseInt(tokens[4], 10)
+    move_number = parseInt(tokens[5], 10)
+
+    update_setup(generate_fen())
+
+    return true
+  }
+
+  /* TODO: this function is pretty much crap - it validates structure but
+   * completely ignores content (e.g. doesn't verify that each side has a king)
+   * ... we should rewrite this, and ditch the silly error_number field while
+   * we're at it
+   */
+  function validate_fen(fen) {
+    var errors = {
+      0: 'No errors.',
+      1: 'FEN string must contain six space-delimited fields.',
+      2: '6th field (move number) must be a positive integer.',
+      3: '5th field (half move counter) must be a non-negative integer.',
+      4: '4th field (en-passant square) is invalid.',
+      5: '3rd field (castling availability) is invalid.',
+      6: '2nd field (side to move) is invalid.',
+      7: "1st field (piece positions) does not contain 8 '/'-delimited rows.",
+      8: '1st field (piece positions) is invalid [consecutive numbers].',
+      9: '1st field (piece positions) is invalid [invalid piece].',
+      10: '1st field (piece positions) is invalid [row too large].',
+      11: 'Illegal en-passant square'
+    }
+
+    /* 1st criterion: 6 space-seperated fields? */
+    var tokens = fen.split(/\s+/)
+    if (tokens.length !== 6) {
+      return { valid: false, error_number: 1, error: errors[1] }
+    }
+
+    /* 2nd criterion: move number field is a integer value > 0? */
+    if (isNaN(tokens[5]) || parseInt(tokens[5], 10) <= 0) {
+      return { valid: false, error_number: 2, error: errors[2] }
+    }
+
+    /* 3rd criterion: half move counter is an integer >= 0? */
+    if (isNaN(tokens[4]) || parseInt(tokens[4], 10) < 0) {
+      return { valid: false, error_number: 3, error: errors[3] }
+    }
+
+    /* 4th criterion: 4th field is a valid e.p.-string? */
+    if (!/^(-|[abcdefgh][36])$/.test(tokens[3])) {
+      return { valid: false, error_number: 4, error: errors[4] }
+    }
+
+    /* 5th criterion: 3th field is a valid castle-string? */
+    if (!/^(KQ?k?q?|Qk?q?|kq?|q|-)$/.test(tokens[2])) {
+      return { valid: false, error_number: 5, error: errors[5] }
+    }
+
+    /* 6th criterion: 2nd field is "w" (white) or "b" (black)? */
+    if (!/^(w|b)$/.test(tokens[1])) {
+      return { valid: false, error_number: 6, error: errors[6] }
+    }
+
+    /* 7th criterion: 1st field contains 8 rows? */
+    var rows = tokens[0].split('/')
+    if (rows.length !== 8) {
+      return { valid: false, error_number: 7, error: errors[7] }
+    }
+
+    /* 8th criterion: every row is valid? */
+    for (var i = 0; i < rows.length; i++) {
+      /* check for right sum of fields AND not two numbers in succession */
+      var sum_fields = 0
+      var previous_was_number = false
+
+      for (var k = 0; k < rows[i].length; k++) {
+        if (!isNaN(rows[i][k])) {
+          if (previous_was_number) {
+            return { valid: false, error_number: 8, error: errors[8] }
+          }
+          sum_fields += parseInt(rows[i][k], 10)
+          previous_was_number = true
+        } else {
+          if (!/^[prnbqkPRNBQK]$/.test(rows[i][k])) {
+            return { valid: false, error_number: 9, error: errors[9] }
+          }
+          sum_fields += 1
+          previous_was_number = false
+        }
+      }
+      if (sum_fields !== 8) {
+        return { valid: false, error_number: 10, error: errors[10] }
+      }
+    }
+
+    if (
+      (tokens[3][1] == '3' && tokens[1] == 'w') ||
+      (tokens[3][1] == '6' && tokens[1] == 'b')
+    ) {
+      return { valid: false, error_number: 11, error: errors[11] }
+    }
+
+    /* everything's okay! */
+    return { valid: true, error_number: 0, error: errors[0] }
+  }
+
+  function generate_fen() {
+    var empty = 0
+    var fen = ''
+
+    for (var i = SQUARES.a8; i <= SQUARES.h1; i++) {
+      if (board[i] == null) {
+        empty++
+      } else {
+        if (empty > 0) {
+          fen += empty
+          empty = 0
+        }
+        var color = board[i].color
+        var piece = board[i].type
+
+        fen += color === WHITE ? piece.toUpperCase() : piece.toLowerCase()
+      }
+
+      if ((i + 1) & 0x88) {
+        if (empty > 0) {
+          fen += empty
+        }
+
+        if (i !== SQUARES.h1) {
+          fen += '/'
+        }
+
+        empty = 0
+        i += 8
+      }
+    }
+
+    var cflags = ''
+    if (castling[WHITE] & BITS.KSIDE_CASTLE) {
+      cflags += 'K'
+    }
+    if (castling[WHITE] & BITS.QSIDE_CASTLE) {
+      cflags += 'Q'
+    }
+    if (castling[BLACK] & BITS.KSIDE_CASTLE) {
+      cflags += 'k'
+    }
+    if (castling[BLACK] & BITS.QSIDE_CASTLE) {
+      cflags += 'q'
+    }
+
+    /* do we have an empty castling flag? */
+    cflags = cflags || '-'
+    var epflags = ep_square === EMPTY ? '-' : algebraic(ep_square)
+
+    return [fen, turn, cflags, epflags, half_moves, move_number].join(' ')
+  }
+
+  function set_header(args) {
+    for (var i = 0; i < args.length; i += 2) {
+      if (typeof args[i] === 'string' && typeof args[i + 1] === 'string') {
+        header[args[i]] = args[i + 1]
+      }
+    }
+    return header
+  }
+
+  /* called when the initial board setup is changed with put() or remove().
+   * modifies the SetUp and FEN properties of the header object.  if the FEN is
+   * equal to the default position, the SetUp and FEN are deleted
+   * the setup is only updated if history.length is zero, ie moves haven't been
+   * made.
+   */
+  function update_setup(fen) {
+    if (history.length > 0) return
+
+    if (fen !== DEFAULT_POSITION) {
+      header['SetUp'] = '1'
+      header['FEN'] = fen
+    } else {
+      delete header['SetUp']
+      delete header['FEN']
+    }
+  }
+
+  function get(square) {
+    var piece = board[SQUARES[square]]
+    return piece ? { type: piece.type, color: piece.color } : null
+  }
+
+  function put(piece, square) {
+    /* check for valid piece object */
+    if (!('type' in piece && 'color' in piece)) {
+      return false
+    }
+
+    /* check for piece */
+    if (SYMBOLS.indexOf(piece.type.toLowerCase()) === -1) {
+      return false
+    }
+
+    /* check for valid square */
+    if (!(square in SQUARES)) {
+      return false
+    }
+
+    var sq = SQUARES[square]
+
+    /* don't let the user place more than one king */
+    if (
+      piece.type == KING &&
+      !(kings[piece.color] == EMPTY || kings[piece.color] == sq)
+    ) {
+      return false
+    }
+
+    board[sq] = { type: piece.type, color: piece.color }
+    if (piece.type === KING) {
+      kings[piece.color] = sq
+    }
+
+    update_setup(generate_fen())
+
+    return true
+  }
+
+  function remove(square) {
+    var piece = get(square)
+    board[SQUARES[square]] = null
+    if (piece && piece.type === KING) {
+      kings[piece.color] = EMPTY
+    }
+
+    update_setup(generate_fen())
+
+    return piece
+  }
+
+  function build_move(board, from, to, flags, promotion) {
+    var move = {
+      color: turn,
+      from: from,
+      to: to,
+      flags: flags,
+      piece: board[from].type
+    }
+
+    if (promotion) {
+      move.flags |= BITS.PROMOTION
+      move.promotion = promotion
+    }
+
+    if (board[to]) {
+      move.captured = board[to].type
+    } else if (flags & BITS.EP_CAPTURE) {
+      move.captured = PAWN
+    }
+    return move
+  }
+
+  function generate_moves(options) {
+    function add_move(board, moves, from, to, flags) {
+      /* if pawn promotion */
+      if (
+        board[from].type === PAWN &&
+        (rank(to) === RANK_8 || rank(to) === RANK_1)
+      ) {
+        var pieces = [QUEEN, ROOK, BISHOP, KNIGHT]
+        for (var i = 0, len = pieces.length; i < len; i++) {
+          moves.push(build_move(board, from, to, flags, pieces[i]))
+        }
+      } else {
+        moves.push(build_move(board, from, to, flags))
+      }
+    }
+
+    var moves = []
+    var us = turn
+    var them = swap_color(us)
+    var second_rank = { b: RANK_7, w: RANK_2 }
+
+    var first_sq = SQUARES.a8
+    var last_sq = SQUARES.h1
+    var single_square = false
+
+    /* do we want legal moves? */
+    var legal =
+      typeof options !== 'undefined' && 'legal' in options
+        ? options.legal
+        : true
+
+    /* are we generating moves for a single square? */
+    if (typeof options !== 'undefined' && 'square' in options) {
+      if (options.square in SQUARES) {
+        first_sq = last_sq = SQUARES[options.square]
+        single_square = true
+      } else {
+        /* invalid square */
+        return []
+      }
+    }
+
+    for (var i = first_sq; i <= last_sq; i++) {
+      /* did we run off the end of the board */
+      if (i & 0x88) {
+        i += 7
+        continue
+      }
+
+      var piece = board[i]
+      if (piece == null || piece.color !== us) {
+        continue
+      }
+
+      if (piece.type === PAWN) {
+        /* single square, non-capturing */
+        var square = i + PAWN_OFFSETS[us][0]
+        if (board[square] == null) {
+          add_move(board, moves, i, square, BITS.NORMAL)
+
+          /* double square */
+          var square = i + PAWN_OFFSETS[us][1]
+          if (second_rank[us] === rank(i) && board[square] == null) {
+            add_move(board, moves, i, square, BITS.BIG_PAWN)
+          }
+        }
+
+        /* pawn captures */
+        for (j = 2; j < 4; j++) {
+          var square = i + PAWN_OFFSETS[us][j]
+          if (square & 0x88) continue
+
+          if (board[square] != null && board[square].color === them) {
+            add_move(board, moves, i, square, BITS.CAPTURE)
+          } else if (square === ep_square) {
+            add_move(board, moves, i, ep_square, BITS.EP_CAPTURE)
+          }
+        }
+      } else {
+        for (var j = 0, len = PIECE_OFFSETS[piece.type].length; j < len; j++) {
+          var offset = PIECE_OFFSETS[piece.type][j]
+          var square = i
+
+          while (true) {
+            square += offset
+            if (square & 0x88) break
+
+            if (board[square] == null) {
+              add_move(board, moves, i, square, BITS.NORMAL)
+            } else {
+              if (board[square].color === us) break
+              add_move(board, moves, i, square, BITS.CAPTURE)
+              break
+            }
+
+            /* break, if knight or king */
+            if (piece.type === 'n' || piece.type === 'k') break
+          }
+        }
+      }
+    }
+
+    /* check for castling if: a) we're generating all moves, or b) we're doing
+     * single square move generation on the king's square
+     */
+    if (!single_square || last_sq === kings[us]) {
+      /* king-side castling */
+      if (castling[us] & BITS.KSIDE_CASTLE) {
+        var castling_from = kings[us]
+        var castling_to = castling_from + 2
+
+        if (
+          board[castling_from + 1] == null &&
+          board[castling_to] == null &&
+          !attacked(them, kings[us]) &&
+          !attacked(them, castling_from + 1) &&
+          !attacked(them, castling_to)
+        ) {
+          add_move(board, moves, kings[us], castling_to, BITS.KSIDE_CASTLE)
+        }
+      }
+
+      /* queen-side castling */
+      if (castling[us] & BITS.QSIDE_CASTLE) {
+        var castling_from = kings[us]
+        var castling_to = castling_from - 2
+
+        if (
+          board[castling_from - 1] == null &&
+          board[castling_from - 2] == null &&
+          board[castling_from - 3] == null &&
+          !attacked(them, kings[us]) &&
+          !attacked(them, castling_from - 1) &&
+          !attacked(them, castling_to)
+        ) {
+          add_move(board, moves, kings[us], castling_to, BITS.QSIDE_CASTLE)
+        }
+      }
+    }
+
+    /* return all pseudo-legal moves (this includes moves that allow the king
+     * to be captured)
+     */
+    if (!legal) {
+      return moves
+    }
+
+    /* filter out illegal moves */
+    var legal_moves = []
+    for (var i = 0, len = moves.length; i < len; i++) {
+      make_move(moves[i])
+      if (!king_attacked(us)) {
+        legal_moves.push(moves[i])
+      }
+      undo_move()
+    }
+
+    return legal_moves
+  }
+
+  /* convert a move from 0x88 coordinates to Standard Algebraic Notation
+   * (SAN)
+   *
+   * @param {boolean} sloppy Use the sloppy SAN generator to work around over
+   * disambiguation bugs in Fritz and Chessbase.  See below:
+   *
+   * r1bqkbnr/ppp2ppp/2n5/1B1pP3/4P3/8/PPPP2PP/RNBQK1NR b KQkq - 2 4
+   * 4. ... Nge7 is overly disambiguated because the knight on c6 is pinned
+   * 4. ... Ne7 is technically the valid SAN
+   */
+  function move_to_san(move, sloppy) {
+    var output = ''
+
+    if (move.flags & BITS.KSIDE_CASTLE) {
+      output = 'O-O'
+    } else if (move.flags & BITS.QSIDE_CASTLE) {
+      output = 'O-O-O'
+    } else {
+      var disambiguator = get_disambiguator(move, sloppy)
+
+      if (move.piece !== PAWN) {
+        output += move.piece.toUpperCase() + disambiguator
+      }
+
+      if (move.flags & (BITS.CAPTURE | BITS.EP_CAPTURE)) {
+        if (move.piece === PAWN) {
+          output += algebraic(move.from)[0]
+        }
+        output += 'x'
+      }
+
+      output += algebraic(move.to)
+
+      if (move.flags & BITS.PROMOTION) {
+        output += '=' + move.promotion.toUpperCase()
+      }
+    }
+
+    make_move(move)
+    if (in_check()) {
+      if (in_checkmate()) {
+        output += '#'
+      } else {
+        output += '+'
+      }
+    }
+    undo_move()
+
+    return output
+  }
+
+  // parses all of the decorators out of a SAN string
+  function stripped_san(move) {
+    return move.replace(/=/, '').replace(/[+#]?[?!]*$/, '')
+  }
+
+  function attacked(color, square) {
+    for (var i = SQUARES.a8; i <= SQUARES.h1; i++) {
+      /* did we run off the end of the board */
+      if (i & 0x88) {
+        i += 7
+        continue
+      }
+
+      /* if empty square or wrong color */
+      if (board[i] == null || board[i].color !== color) continue
+
+      var piece = board[i]
+      var difference = i - square
+      var index = difference + 119
+
+      if (ATTACKS[index] & (1 << SHIFTS[piece.type])) {
+        if (piece.type === PAWN) {
+          if (difference > 0) {
+            if (piece.color === WHITE) return true
+          } else {
+            if (piece.color === BLACK) return true
+          }
+          continue
+        }
+
+        /* if the piece is a knight or a king */
+        if (piece.type === 'n' || piece.type === 'k') return true
+
+        var offset = RAYS[index]
+        var j = i + offset
+
+        var blocked = false
+        while (j !== square) {
+          if (board[j] != null) {
+            blocked = true
+            break
+          }
+          j += offset
+        }
+
+        if (!blocked) return true
+      }
+    }
+
+    return false
+  }
+
+  function king_attacked(color) {
+    return attacked(swap_color(color), kings[color])
+  }
+
+  function in_check() {
+    return king_attacked(turn)
+  }
+
+  function in_checkmate() {
+    return in_check() && generate_moves().length === 0
+  }
+
+  function in_stalemate() {
+    return !in_check() && generate_moves().length === 0
+  }
+
+  function insufficient_material() {
+    var pieces = {}
+    var bishops = []
+    var num_pieces = 0
+    var sq_color = 0
+
+    for (var i = SQUARES.a8; i <= SQUARES.h1; i++) {
+      sq_color = (sq_color + 1) % 2
+      if (i & 0x88) {
+        i += 7
+        continue
+      }
+
+      var piece = board[i]
+      if (piece) {
+        pieces[piece.type] = piece.type in pieces ? pieces[piece.type] + 1 : 1
+        if (piece.type === BISHOP) {
+          bishops.push(sq_color)
+        }
+        num_pieces++
+      }
+    }
+
+    /* k vs. k */
+    if (num_pieces === 2) {
+      return true
+    } else if (
+      /* k vs. kn .... or .... k vs. kb */
+      num_pieces === 3 &&
+      (pieces[BISHOP] === 1 || pieces[KNIGHT] === 1)
+    ) {
+      return true
+    } else if (num_pieces === pieces[BISHOP] + 2) {
+      /* kb vs. kb where any number of bishops are all on the same color */
+      var sum = 0
+      var len = bishops.length
+      for (var i = 0; i < len; i++) {
+        sum += bishops[i]
+      }
+      if (sum === 0 || sum === len) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  function in_threefold_repetition() {
+    /* TODO: while this function is fine for casual use, a better
+     * implementation would use a Zobrist key (instead of FEN). the
+     * Zobrist key would be maintained in the make_move/undo_move functions,
+     * avoiding the costly that we do below.
+     */
+    var moves = []
+    var positions = {}
+    var repetition = false
+
+    while (true) {
+      var move = undo_move()
+      if (!move) break
+      moves.push(move)
+    }
+
+    while (true) {
+      /* remove the last two fields in the FEN string, they're not needed
+       * when checking for draw by rep */
+      var fen = generate_fen()
+        .split(' ')
+        .slice(0, 4)
+        .join(' ')
+
+      /* has the position occurred three or move times */
+      positions[fen] = fen in positions ? positions[fen] + 1 : 1
+      if (positions[fen] >= 3) {
+        repetition = true
+      }
+
+      if (!moves.length) {
+        break
+      }
+      make_move(moves.pop())
+    }
+
+    return repetition
+  }
+
+  function push(move) {
+    history.push({
+      move: move,
+      kings: { b: kings.b, w: kings.w },
+      turn: turn,
+      castling: { b: castling.b, w: castling.w },
+      ep_square: ep_square,
+      half_moves: half_moves,
+      move_number: move_number
+    })
+  }
+
+  function make_move(move) {
+    var us = turn
+    var them = swap_color(us)
+    push(move)
+
+    board[move.to] = board[move.from]
+    board[move.from] = null
+
+    /* if ep capture, remove the captured pawn */
+    if (move.flags & BITS.EP_CAPTURE) {
+      if (turn === BLACK) {
+        board[move.to - 16] = null
+      } else {
+        board[move.to + 16] = null
+      }
+    }
+
+    /* if pawn promotion, replace with new piece */
+    if (move.flags & BITS.PROMOTION) {
+      board[move.to] = { type: move.promotion, color: us }
+    }
+
+    /* if we moved the king */
+    if (board[move.to].type === KING) {
+      kings[board[move.to].color] = move.to
+
+      /* if we castled, move the rook next to the king */
+      if (move.flags & BITS.KSIDE_CASTLE) {
+        var castling_to = move.to - 1
+        var castling_from = move.to + 1
+        board[castling_to] = board[castling_from]
+        board[castling_from] = null
+      } else if (move.flags & BITS.QSIDE_CASTLE) {
+        var castling_to = move.to + 1
+        var castling_from = move.to - 2
+        board[castling_to] = board[castling_from]
+        board[castling_from] = null
+      }
+
+      /* turn off castling */
+      castling[us] = ''
+    }
+
+    /* turn off castling if we move a rook */
+    if (castling[us]) {
+      for (var i = 0, len = ROOKS[us].length; i < len; i++) {
+        if (
+          move.from === ROOKS[us][i].square &&
+          castling[us] & ROOKS[us][i].flag
+        ) {
+          castling[us] ^= ROOKS[us][i].flag
+          break
+        }
+      }
+    }
+
+    /* turn off castling if we capture a rook */
+    if (castling[them]) {
+      for (var i = 0, len = ROOKS[them].length; i < len; i++) {
+        if (
+          move.to === ROOKS[them][i].square &&
+          castling[them] & ROOKS[them][i].flag
+        ) {
+          castling[them] ^= ROOKS[them][i].flag
+          break
+        }
+      }
+    }
+
+    /* if big pawn move, update the en passant square */
+    if (move.flags & BITS.BIG_PAWN) {
+      if (turn === 'b') {
+        ep_square = move.to - 16
+      } else {
+        ep_square = move.to + 16
+      }
+    } else {
+      ep_square = EMPTY
+    }
+
+    /* reset the 50 move counter if a pawn is moved or a piece is captured */
+    if (move.piece === PAWN) {
+      half_moves = 0
+    } else if (move.flags & (BITS.CAPTURE | BITS.EP_CAPTURE)) {
+      half_moves = 0
+    } else {
+      half_moves++
+    }
+
+    if (turn === BLACK) {
+      move_number++
+    }
+    turn = swap_color(turn)
+  }
+
+  function undo_move() {
+    var old = history.pop()
+    if (old == null) {
+      return null
+    }
+
+    var move = old.move
+    kings = old.kings
+    turn = old.turn
+    castling = old.castling
+    ep_square = old.ep_square
+    half_moves = old.half_moves
+    move_number = old.move_number
+
+    var us = turn
+    var them = swap_color(turn)
+
+    board[move.from] = board[move.to]
+    board[move.from].type = move.piece // to undo any promotions
+    board[move.to] = null
+
+    if (move.flags & BITS.CAPTURE) {
+      board[move.to] = { type: move.captured, color: them }
+    } else if (move.flags & BITS.EP_CAPTURE) {
+      var index
+      if (us === BLACK) {
+        index = move.to - 16
+      } else {
+        index = move.to + 16
+      }
+      board[index] = { type: PAWN, color: them }
+    }
+
+    if (move.flags & (BITS.KSIDE_CASTLE | BITS.QSIDE_CASTLE)) {
+      var castling_to, castling_from
+      if (move.flags & BITS.KSIDE_CASTLE) {
+        castling_to = move.to + 1
+        castling_from = move.to - 1
+      } else if (move.flags & BITS.QSIDE_CASTLE) {
+        castling_to = move.to - 2
+        castling_from = move.to + 1
+      }
+
+      board[castling_to] = board[castling_from]
+      board[castling_from] = null
+    }
+
+    return move
+  }
+
+  /* this function is used to uniquely identify ambiguous moves */
+  function get_disambiguator(move, sloppy) {
+    var moves = generate_moves({ legal: !sloppy })
+
+    var from = move.from
+    var to = move.to
+    var piece = move.piece
+
+    var ambiguities = 0
+    var same_rank = 0
+    var same_file = 0
+
+    for (var i = 0, len = moves.length; i < len; i++) {
+      var ambig_from = moves[i].from
+      var ambig_to = moves[i].to
+      var ambig_piece = moves[i].piece
+
+      /* if a move of the same piece type ends on the same to square, we'll
+       * need to add a disambiguator to the algebraic notation
+       */
+      if (piece === ambig_piece && from !== ambig_from && to === ambig_to) {
+        ambiguities++
+
+        if (rank(from) === rank(ambig_from)) {
+          same_rank++
+        }
+
+        if (file(from) === file(ambig_from)) {
+          same_file++
+        }
+      }
+    }
+
+    if (ambiguities > 0) {
+      /* if there exists a similar moving piece on the same rank and file as
+       * the move in question, use the square as the disambiguator
+       */
+      if (same_rank > 0 && same_file > 0) {
+        return algebraic(from)
+      } else if (same_file > 0) {
+        /* if the moving piece rests on the same file, use the rank symbol as the
+         * disambiguator
+         */
+        return algebraic(from).charAt(1)
+      } else {
+        /* else use the file symbol */
+        return algebraic(from).charAt(0)
+      }
+    }
+
+    return ''
+  }
+
+  function ascii() {
+    var s = '   +------------------------+\n'
+    for (var i = SQUARES.a8; i <= SQUARES.h1; i++) {
+      /* display the rank */
+      if (file(i) === 0) {
+        s += ' ' + '87654321'[rank(i)] + ' |'
+      }
+
+      /* empty piece */
+      if (board[i] == null) {
+        s += ' . '
+      } else {
+        var piece = board[i].type
+        var color = board[i].color
+        var symbol = color === WHITE ? piece.toUpperCase() : piece.toLowerCase()
+        s += ' ' + symbol + ' '
+      }
+
+      if ((i + 1) & 0x88) {
+        s += '|\n'
+        i += 8
+      }
+    }
+    s += '   +------------------------+\n'
+    s += '     a  b  c  d  e  f  g  h\n'
+
+    return s
+  }
+
+  // convert a move from Standard Algebraic Notation (SAN) to 0x88 coordinates
+  function move_from_san(move, sloppy) {
+    // strip off any move decorations: e.g Nf3+?!
+    var clean_move = stripped_san(move)
+
+    // if we're using the sloppy parser run a regex to grab piece, to, and from
+    // this should parse invalid SAN like: Pe2-e4, Rc1c4, Qf3xf7
+    if (sloppy) {
+      var matches = clean_move.match(
+        /([pnbrqkPNBRQK])?([a-h][1-8])x?-?([a-h][1-8])([qrbnQRBN])?/
+      )
+      if (matches) {
+        var piece = matches[1]
+        var from = matches[2]
+        var to = matches[3]
+        var promotion = matches[4]
+      }
+    }
+
+    var moves = generate_moves()
+    for (var i = 0, len = moves.length; i < len; i++) {
+      // try the strict parser first, then the sloppy parser if requested
+      // by the user
+      if (
+        clean_move === stripped_san(move_to_san(moves[i])) ||
+        (sloppy && clean_move === stripped_san(move_to_san(moves[i], true)))
+      ) {
+        return moves[i]
+      } else {
+        if (
+          matches &&
+          (!piece || piece.toLowerCase() == moves[i].piece) &&
+          SQUARES[from] == moves[i].from &&
+          SQUARES[to] == moves[i].to &&
+          (!promotion || promotion.toLowerCase() == moves[i].promotion)
+        ) {
+          return moves[i]
+        }
+      }
+    }
+
+    return null
+  }
+
+  /*****************************************************************************
+   * UTILITY FUNCTIONS
+   ****************************************************************************/
+  function rank(i) {
+    return i >> 4
+  }
+
+  function file(i) {
+    return i & 15
+  }
+
+  function algebraic(i) {
+    var f = file(i),
+      r = rank(i)
+    return 'abcdefgh'.substring(f, f + 1) + '87654321'.substring(r, r + 1)
+  }
+
+  function swap_color(c) {
+    return c === WHITE ? BLACK : WHITE
+  }
+
+  function is_digit(c) {
+    return '0123456789'.indexOf(c) !== -1
+  }
+
+  /* pretty = external move object */
+  function make_pretty(ugly_move) {
+    var move = clone(ugly_move)
+    move.san = move_to_san(move, false)
+    move.to = algebraic(move.to)
+    move.from = algebraic(move.from)
+
+    var flags = ''
+
+    for (var flag in BITS) {
+      if (BITS[flag] & move.flags) {
+        flags += FLAGS[flag]
+      }
+    }
+    move.flags = flags
+
+    return move
+  }
+
+  function clone(obj) {
+    var dupe = obj instanceof Array ? [] : {}
+
+    for (var property in obj) {
+      if (typeof property === 'object') {
+        dupe[property] = clone(obj[property])
+      } else {
+        dupe[property] = obj[property]
+      }
+    }
+
+    return dupe
+  }
+
+  function trim(str) {
+    return str.replace(/^\s+|\s+$/g, '')
+  }
+
+  /*****************************************************************************
+   * DEBUGGING UTILITIES
+   ****************************************************************************/
+  function perft(depth) {
+    var moves = generate_moves({ legal: false })
+    var nodes = 0
+    var color = turn
+
+    for (var i = 0, len = moves.length; i < len; i++) {
+      make_move(moves[i])
+      if (!king_attacked(color)) {
+        if (depth - 1 > 0) {
+          var child_nodes = perft(depth - 1)
+          nodes += child_nodes
+        } else {
+          nodes++
+        }
+      }
+      undo_move()
+    }
+
+    return nodes
+  }
+
+  return {
+    /***************************************************************************
+     * PUBLIC CONSTANTS (is there a better way to do this?)
+     **************************************************************************/
+    WHITE: WHITE,
+    BLACK: BLACK,
+    PAWN: PAWN,
+    KNIGHT: KNIGHT,
+    BISHOP: BISHOP,
+    ROOK: ROOK,
+    QUEEN: QUEEN,
+    KING: KING,
+    SQUARES: (function() {
+      /* from the ECMA-262 spec (section 12.6.4):
+       * "The mechanics of enumerating the properties ... is
+       * implementation dependent"
+       * so: for (var sq in SQUARES) { keys.push(sq); } might not be
+       * ordered correctly
+       */
+      var keys = []
+      for (var i = SQUARES.a8; i <= SQUARES.h1; i++) {
+        if (i & 0x88) {
+          i += 7
+          continue
+        }
+        keys.push(algebraic(i))
+      }
+      return keys
+    })(),
+    FLAGS: FLAGS,
+
+    /***************************************************************************
+     * PUBLIC API
+     **************************************************************************/
+    load: function(fen) {
+      return load(fen)
+    },
+
+    reset: function() {
+      return reset()
+    },
+
+    moves: function(options) {
+      /* The internal representation of a chess move is in 0x88 format, and
+       * not meant to be human-readable.  The code below converts the 0x88
+       * square coordinates to algebraic coordinates.  It also prunes an
+       * unnecessary move keys resulting from a verbose call.
+       */
+
+      var ugly_moves = generate_moves(options)
+      var moves = []
+
+      for (var i = 0, len = ugly_moves.length; i < len; i++) {
+        /* does the user want a full move object (most likely not), or just
+         * SAN
+         */
+        if (
+          typeof options !== 'undefined' &&
+          'verbose' in options &&
+          options.verbose
+        ) {
+          moves.push(make_pretty(ugly_moves[i]))
+        } else {
+          moves.push(move_to_san(ugly_moves[i], false))
+        }
+      }
+
+      return moves
+    },
+
+    in_check: function() {
+      return in_check()
+    },
+
+    in_checkmate: function() {
+      return in_checkmate()
+    },
+
+    in_stalemate: function() {
+      return in_stalemate()
+    },
+
+    in_draw: function() {
+      return (
+        half_moves >= 100 ||
+        in_stalemate() ||
+        insufficient_material() ||
+        in_threefold_repetition()
+      )
+    },
+
+    insufficient_material: function() {
+      return insufficient_material()
+    },
+
+    in_threefold_repetition: function() {
+      return in_threefold_repetition()
+    },
+
+    game_over: function() {
+      return (
+        half_moves >= 100 ||
+        in_checkmate() ||
+        in_stalemate() ||
+        insufficient_material() ||
+        in_threefold_repetition()
+      )
+    },
+
+    validate_fen: function(fen) {
+      return validate_fen(fen)
+    },
+
+    fen: function() {
+      return generate_fen()
+    },
+
+    board: function() {
+      var output = [],
+        row = []
+
+      for (var i = SQUARES.a8; i <= SQUARES.h1; i++) {
+        if (board[i] == null) {
+          row.push(null)
+        } else {
+          row.push({ type: board[i].type, color: board[i].color })
+        }
+        if ((i + 1) & 0x88) {
+          output.push(row)
+          row = []
+          i += 8
+        }
+      }
+
+      return output
+    },
+
+    pgn: function(options) {
+      /* using the specification from http://www.chessclub.com/help/PGN-spec
+       * example for html usage: .pgn({ max_width: 72, newline_char: "<br />" })
+       */
+      var newline =
+        typeof options === 'object' && typeof options.newline_char === 'string'
+          ? options.newline_char
+          : '\n'
+      var max_width =
+        typeof options === 'object' && typeof options.max_width === 'number'
+          ? options.max_width
+          : 0
+      var result = []
+      var header_exists = false
+
+      /* add the PGN header headerrmation */
+      for (var i in header) {
+        /* TODO: order of enumerated properties in header object is not
+         * guaranteed, see ECMA-262 spec (section 12.6.4)
+         */
+        result.push('[' + i + ' "' + header[i] + '"]' + newline)
+        header_exists = true
+      }
+
+      if (header_exists && history.length) {
+        result.push(newline)
+      }
+
+      /* pop all of history onto reversed_history */
+      var reversed_history = []
+      while (history.length > 0) {
+        reversed_history.push(undo_move())
+      }
+
+      var moves = []
+      var move_string = ''
+
+      /* build the list of moves.  a move_string looks like: "3. e3 e6" */
+      while (reversed_history.length > 0) {
+        var move = reversed_history.pop()
+
+        /* if the position started with black to move, start PGN with 1. ... */
+        if (!history.length && move.color === 'b') {
+          move_string = move_number + '. ...'
+        } else if (move.color === 'w') {
+          /* store the previous generated move_string if we have one */
+          if (move_string.length) {
+            moves.push(move_string)
+          }
+          move_string = move_number + '.'
+        }
+
+        move_string = move_string + ' ' + move_to_san(move, false)
+        make_move(move)
+      }
+
+      /* are there any other leftover moves? */
+      if (move_string.length) {
+        moves.push(move_string)
+      }
+
+      /* is there a result? */
+      if (typeof header.Result !== 'undefined') {
+        moves.push(header.Result)
+      }
+
+      /* history should be back to what is was before we started generating PGN,
+       * so join together moves
+       */
+      if (max_width === 0) {
+        return result.join('') + moves.join(' ')
+      }
+
+      /* wrap the PGN output at max_width */
+      var current_width = 0
+      for (var i = 0; i < moves.length; i++) {
+        /* if the current move will push past max_width */
+        if (current_width + moves[i].length > max_width && i !== 0) {
+          /* don't end the line with whitespace */
+          if (result[result.length - 1] === ' ') {
+            result.pop()
+          }
+
+          result.push(newline)
+          current_width = 0
+        } else if (i !== 0) {
+          result.push(' ')
+          current_width++
+        }
+        result.push(moves[i])
+        current_width += moves[i].length
+      }
+
+      return result.join('')
+    },
+
+    load_pgn: function(pgn, options) {
+      // allow the user to specify the sloppy move parser to work around over
+      // disambiguation bugs in Fritz and Chessbase
+      var sloppy =
+        typeof options !== 'undefined' && 'sloppy' in options
+          ? options.sloppy
+          : false
+
+      function mask(str) {
+        return str.replace(/\\/g, '\\')
+      }
+
+      function has_keys(object) {
+        for (var key in object) {
+          return true
+        }
+        return false
+      }
+
+      function parse_pgn_header(header, options) {
+        var newline_char =
+          typeof options === 'object' &&
+          typeof options.newline_char === 'string'
+            ? options.newline_char
+            : '\r?\n'
+        var header_obj = {}
+        var headers = header.split(new RegExp(mask(newline_char)))
+        var key = ''
+        var value = ''
+
+        for (var i = 0; i < headers.length; i++) {
+          key = headers[i].replace(/^\[([A-Z][A-Za-z]*)\s.*\]$/, '$1')
+          value = headers[i].replace(/^\[[A-Za-z]+\s"(.*)"\]$/, '$1')
+          if (trim(key).length > 0) {
+            header_obj[key] = value
+          }
+        }
+
+        return header_obj
+      }
+
+      var newline_char =
+        typeof options === 'object' && typeof options.newline_char === 'string'
+          ? options.newline_char
+          : '\r?\n'
+
+      // RegExp to split header. Takes advantage of the fact that header and movetext
+      // will always have a blank line between them (ie, two newline_char's).
+      // With default newline_char, will equal: /^(\[((?:\r?\n)|.)*\])(?:\r?\n){2}/
+      var header_regex = new RegExp(
+        '^(\\[((?:' +
+          mask(newline_char) +
+          ')|.)*\\])' +
+          '(?:' +
+          mask(newline_char) +
+          '){2}'
+      )
+
+      // If no header given, begin with moves.
+      var header_string = header_regex.test(pgn)
+        ? header_regex.exec(pgn)[1]
+        : ''
+
+      // Put the board in the starting position
+      reset()
+
+      /* parse PGN header */
+      var headers = parse_pgn_header(header_string, options)
+      for (var key in headers) {
+        set_header([key, headers[key]])
+      }
+
+      /* load the starting position indicated by [Setup '1'] and
+       * [FEN position] */
+      if (headers['SetUp'] === '1') {
+        if (!('FEN' in headers && load(headers['FEN'], true))) {
+          // second argument to load: don't clear the headers
+          return false
+        }
+      }
+
+      /* delete header to get the moves */
+      var ms = pgn
+        .replace(header_string, '')
+        .replace(new RegExp(mask(newline_char), 'g'), ' ')
+
+      /* delete comments */
+      ms = ms.replace(/(\{[^}]+\})+?/g, '')
+
+      /* delete recursive annotation variations */
+      var rav_regex = /(\([^\(\)]+\))+?/g
+      while (rav_regex.test(ms)) {
+        ms = ms.replace(rav_regex, '')
+      }
+
+      /* delete move numbers */
+      ms = ms.replace(/\d+\.(\.\.)?/g, '')
+
+      /* delete ... indicating black to move */
+      ms = ms.replace(/\.\.\./g, '')
+
+      /* delete numeric annotation glyphs */
+      ms = ms.replace(/\$\d+/g, '')
+
+      /* trim and get array of moves */
+      var moves = trim(ms).split(new RegExp(/\s+/))
+
+      /* delete empty entries */
+      moves = moves
+        .join(',')
+        .replace(/,,+/g, ',')
+        .split(',')
+      var move = ''
+
+      for (var half_move = 0; half_move < moves.length - 1; half_move++) {
+        move = move_from_san(moves[half_move], sloppy)
+
+        /* move not possible! (don't clear the board to examine to show the
+         * latest valid position)
+         */
+        if (move == null) {
+          return false
+        } else {
+          make_move(move)
+        }
+      }
+
+      /* examine last move */
+      move = moves[moves.length - 1]
+      if (POSSIBLE_RESULTS.indexOf(move) > -1) {
+        if (has_keys(header) && typeof header.Result === 'undefined') {
+          set_header(['Result', move])
+        }
+      } else {
+        move = move_from_san(move, sloppy)
+        if (move == null) {
+          return false
+        } else {
+          make_move(move)
+        }
+      }
+      return true
+    },
+
+    header: function() {
+      return set_header(arguments)
+    },
+
+    ascii: function() {
+      return ascii()
+    },
+
+    turn: function() {
+      return turn
+    },
+
+    move: function(move, options) {
+      /* The move function can be called with in the following parameters:
+       *
+       * .move('Nxb7')      <- where 'move' is a case-sensitive SAN string
+       *
+       * .move({ from: 'h7', <- where the 'move' is a move object (additional
+       *         to :'h8',      fields are ignored)
+       *         promotion: 'q',
+       *      })
+       */
+
+      // allow the user to specify the sloppy move parser to work around over
+      // disambiguation bugs in Fritz and Chessbase
+      var sloppy =
+        typeof options !== 'undefined' && 'sloppy' in options
+          ? options.sloppy
+          : false
+
+      var move_obj = null
+
+      if (typeof move === 'string') {
+        move_obj = move_from_san(move, sloppy)
+      } else if (typeof move === 'object') {
+        var moves = generate_moves()
+
+        /* convert the pretty move object to an ugly move object */
+        for (var i = 0, len = moves.length; i < len; i++) {
+          if (
+            move.from === algebraic(moves[i].from) &&
+            move.to === algebraic(moves[i].to) &&
+            (!('promotion' in moves[i]) ||
+              move.promotion === moves[i].promotion)
+          ) {
+            move_obj = moves[i]
+            break
+          }
+        }
+      }
+
+      /* failed to find move */
+      if (!move_obj) {
+        return null
+      }
+
+      /* need to make a copy of move because we can't generate SAN after the
+       * move is made
+       */
+      var pretty_move = make_pretty(move_obj)
+
+      make_move(move_obj)
+
+      return pretty_move
+    },
+
+    undo: function() {
+      var move = undo_move()
+      return move ? make_pretty(move) : null
+    },
+
+    clear: function() {
+      return clear()
+    },
+
+    put: function(piece, square) {
+      return put(piece, square)
+    },
+
+    get: function(square) {
+      return get(square)
+    },
+
+    remove: function(square) {
+      return remove(square)
+    },
+
+    perft: function(depth) {
+      return perft(depth)
+    },
+
+    square_color: function(square) {
+      if (square in SQUARES) {
+        var sq_0x88 = SQUARES[square]
+        return (rank(sq_0x88) + file(sq_0x88)) % 2 === 0 ? 'light' : 'dark'
+      }
+
+      return null
+    },
+
+    history: function(options) {
+      var reversed_history = []
+      var move_history = []
+      var verbose =
+        typeof options !== 'undefined' &&
+        'verbose' in options &&
+        options.verbose
+
+      while (history.length > 0) {
+        reversed_history.push(undo_move())
+      }
+
+      while (reversed_history.length > 0) {
+        var move = reversed_history.pop()
+        if (verbose) {
+          move_history.push(make_pretty(move))
+        } else {
+          move_history.push(move_to_san(move))
+        }
+        make_move(move)
+      }
+
+      return move_history
+    }
+  }
+}
+
+/* export Chess object if using node or any other CommonJS compatible
+ * environment */
+if (typeof exports !== 'undefined') exports.Chess = Chess
+/* export Chess object for any RequireJS compatible environment */
+if (typeof define !== 'undefined')
+  define(function() {
+    return Chess
+  })
+
+</script>
+
+<style>
+  .result-overlay{
+    position:absolute; inset:0; border-radius:7px; z-index:30;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(20,12,6,0.72);
+    animation: fadeInResult 300ms ease;
+  }
+  @keyframes fadeInResult{from{opacity:0;}to{opacity:1;}}
+  .result-badge{
+    position:relative; width:min(80%, 300px); aspect-ratio:1;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .result-badge svg{ width:100%; height:100%; filter:drop-shadow(0 6px 16px rgba(0,0,0,0.55)); }
+  .result-newgame-btn{ position:absolute; bottom:-8%; left:50%; transform:translateX(-50%); white-space:nowrap; }
+  :root{
+    --wood-950:#211309;
+    --wood-900:#2f1c10;
+    --wood-800:#43291a;
+    --wood-700:#5c3820;
+    --wood-600:#7a4c28;
+    --wood-500:#9c6633;
+    --board-light:#e8caa0;
+    --board-dark:#8a5a2e;
+    --brass:#cda254;
+    --brass-bright:#e7c579;
+    --cream:#f3e6c9;
+    --ink:#2a1a0f;
+    --danger:#b5432b;
+    --good:#5f7a3c;
+    --warn:#c1852f;
+    --info:#5c86a0;
+    --board-size: clamp(320px, min(80vh, 56vw), 860px);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--wood-950);color:var(--cream);font-family:'Nunito Sans',sans-serif;}
+  body{
+    background-image:
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.08) 0px, rgba(0,0,0,0.08) 1px, transparent 1px, transparent 80px),
+      radial-gradient(ellipse at top, #3a2414 0%, var(--wood-950) 70%);
+    min-height:100vh;
+  }
+  h1,h2,h3,.display{font-family:'Fraunces', serif;}
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--wood-600);border-radius:4px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:7px 28px;border-bottom:2px solid var(--brass);
+    background:linear-gradient(180deg, var(--wood-900), var(--wood-950));
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-mark{width:34px;height:34px;border:2px solid var(--brass);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--brass-bright);
+    background:var(--wood-800);}
+  .brand h1{font-size:22px;margin:0;color:var(--cream);letter-spacing:0.3px;}
+  .brand small{display:block;font-size:11px;color:var(--brass);letter-spacing:1.5px;text-transform:uppercase;}
+
+  .btn{
+    font-family:'Nunito Sans',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.3px;
+    background:linear-gradient(180deg, var(--wood-600), var(--wood-700));
+    color:var(--cream);border:1px solid var(--brass);border-radius:6px;
+    padding:9px 16px;cursor:pointer;transition:background 0.15s, transform 0.1s;
+  }
+  .btn:hover{background:linear-gradient(180deg, var(--wood-500), var(--wood-600));}
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:0.45;cursor:not-allowed;}
+  .btn-ghost{background:transparent;border:1px solid var(--wood-600);}
+
+  .layout{
+    display:grid;
+    grid-template-columns: 300px 1fr 300px;
+    gap:24px;
+    padding:10px clamp(16px, 4vw, 56px) 14px;
+    align-items:start;
+  }
+  .col{display:flex;flex-direction:column;gap:10px;width:100%;}
+  .col.left{grid-column:1;}
+  .col.right{grid-column:3;}
+  .board-zone{grid-column:2;justify-self:center;}
+  @media (max-width: 1100px){
+    .layout{grid-template-columns:1fr;}
+    .col.left, .col.right, .board-zone{grid-column:1;justify-self:center;}
+  }
+
+  .panel{
+    background:linear-gradient(180deg, var(--wood-800), var(--wood-900));
+    border:1px solid var(--wood-600);border-radius:10px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.35);
+    padding:10px 14px;
+  }
+  .panel h3{
+    margin:0 0 7px 0;font-size:13px;text-transform:uppercase;letter-spacing:1.2px;
+    color:var(--brass-bright);display:flex;align-items:center;justify-content:space-between;
+  }
+  .badge{
+    background:var(--wood-700);border:1px solid var(--brass);color:var(--cream);
+    font-size:11px;padding:2px 9px;border-radius:20px;font-weight:700;
+  }
+
+  /* --- board + frame --- */
+  .board-zone{display:flex;align-items:flex-start;gap:4px;}
+  .eval-bar-wrap{
+    display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:17px;
+  }
+  .eval-bar{
+    width:26px;height:var(--board-size);border:2px solid var(--brass);border-radius:5px;
+    background:var(--ink);position:relative;overflow:hidden;
+    box-shadow:inset 0 0 8px rgba(0,0,0,0.6);
+  }
+  .eval-fill{
+    position:absolute;bottom:0;left:0;width:100%;background:linear-gradient(180deg,#f3e6c9,#cbb98d);
+    transition:height 600ms ease;
+  }
+  .eval-fill.mate{background:linear-gradient(180deg,#e0453a,#8f2416);}
+  .eval-label{font-size:11px;color:var(--brass);font-weight:700;}
+
+  .board-frame{
+    padding:14px;border-radius:10px;
+    background:linear-gradient(135deg, var(--wood-700), var(--wood-900));
+    border:3px solid var(--brass);box-shadow:0 8px 24px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(0,0,0,0.3);
+    position:relative;
+  }
+  .corner{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--brass-bright);
+    box-shadow:0 0 4px rgba(0,0,0,0.6);}
+  .corner.tl{top:6px;left:6px;} .corner.tr{top:6px;right:6px;}
+  .corner.bl{bottom:6px;left:6px;} .corner.br{bottom:6px;right:6px;}
+
+  .board{
+    position:relative;width:var(--board-size);height:var(--board-size);border-radius:3px;overflow:hidden;
+    box-shadow:0 0 0 2px var(--wood-900);
+  }
+  .square{position:absolute;width:12.5%;height:12.5%;}
+  .square.light{background:var(--board-light);}
+  .square.dark{background:var(--board-dark);}
+  .square.selected{box-shadow:inset 0 0 0 3px rgba(205,162,84,0.85);}
+  .square.last-move{background-image:linear-gradient(rgba(205,162,84,0.35), rgba(205,162,84,0.35));}
+  .square.check{background-image:radial-gradient(circle, rgba(181,67,43,0.6), transparent 70%);}
+  .sq-coord{position:absolute;font-size:9px;font-weight:800;opacity:0.55;pointer-events:none;}
+  .sq-coord.file{bottom:1px;right:3px;}
+  .sq-coord.rank{top:1px;left:3px;}
+
+  .dot-target{
+    position:absolute;width:12.5%;height:12.5%;display:flex;align-items:center;justify-content:center;
+    pointer-events:none;
+  }
+  .dot-target .dot{width:22%;height:22%;border-radius:50%;background:rgba(42,26,15,0.45);}
+  .dot-target.capture .dot{
+    width:80%;height:80%;background:transparent;border:4px solid rgba(181,67,43,0.55);border-radius:50%;
+  }
+
+  .piece{
+    position:absolute;width:12.5%;height:12.5%;display:flex;align-items:center;justify-content:center;
+    font-size:calc(var(--board-size) * 0.0786);line-height:1;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;
+    transition:left 380ms ease, top 380ms ease;
+    z-index:5;
+  }
+  .piece.white{color:#f6ecd8;text-shadow:0 1px 0 #8a5a2e, 0 2px 3px rgba(0,0,0,0.6);}
+  .piece.black{color:#241209;text-shadow:0 1px 0 #d8b578, 0 1px 2px rgba(0,0,0,0.5);}
+  .piece.dragging{z-index:20;cursor:grabbing;transition:none;filter:drop-shadow(0 6px 8px rgba(0,0,0,0.5));}
+
+  /* --- move history --- */
+  .move-history{max-height:140px;overflow-y:auto;font-family:'Nunito Sans',sans-serif;font-size:13px;}
+  .move-row{display:flex;gap:8px;padding:3px 4px;border-radius:4px;}
+  .move-row:hover{background:rgba(205,162,84,0.1);}
+  .move-num{color:var(--brass);width:26px;font-weight:700;}
+  .move-san{flex:1;cursor:pointer;padding:1px 4px;border-radius:3px;}
+  .move-san:hover{background:var(--wood-700);}
+  .total-moves-tracker{font-size:20px;font-weight:800;color:var(--brass-bright);}
+
+  /* --- chat --- */
+  .chat-log{max-height:100px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:6px;}
+  .chat-msg{font-size:13px;padding:7px 10px;border-radius:8px;max-width:88%;}
+  .chat-msg.user{align-self:flex-end;background:var(--wood-600);}
+  .chat-msg.coach{align-self:flex-start;background:var(--wood-900);border:1px solid var(--wood-600);}
+  .chat-input-row{display:flex;gap:6px;}
+  .chat-input-row input{
+    flex:1;background:var(--wood-900);border:1px solid var(--wood-600);border-radius:6px;
+    color:var(--cream);padding:8px 10px;font-size:13px;
+  }
+
+  /* --- analysis panel --- */
+  .analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:8px;}
+  .stat-box{background:var(--wood-900);border:1px solid var(--wood-700);border-radius:7px;padding:8px 10px;}
+  .stat-box .label{font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--brass);display:block;margin-bottom:3px;}
+  .stat-box .value{font-weight:800;font-size:16px;}
+  .quality-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-weight:800;font-size:12px;color:#fff;}
+  .motif-chip{display:inline-block;background:var(--wood-700);border:1px solid var(--brass);border-radius:14px;
+    padding:2px 9px;font-size:11px;margin:2px 4px 0 0;}
+
+  /* --- coach note --- */
+  .coach-note{font-size:13px;line-height:1.5;min-height:52px;max-height:110px;overflow-y:auto;font-family:'Fraunces', serif;font-style:italic;color:var(--cream);}
+  .thinking-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--brass-bright);
+    margin-left:6px;animation:pulse 1s infinite ease-in-out;}
+  @keyframes pulse{0%,100%{opacity:0.2;}50%{opacity:1;}}
+
+  /* --- input bar --- */
+  .io-row{display:flex;gap:6px;margin-bottom:8px;}
+  .io-row input, .io-row textarea{
+    flex:1;background:var(--wood-900);border:1px solid var(--wood-700);border-radius:6px;
+    color:var(--cream);padding:7px 9px;font-size:12px;font-family:monospace;
+  }
+  .io-row textarea{resize:vertical;min-height:44px;}
+
+  /* --- profile modal --- */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(10,6,3,0.75);display:flex;align-items:center;
+    justify-content:center;z-index:100;}
+  .modal{
+    background:linear-gradient(180deg, var(--wood-800), var(--wood-900));border:2px solid var(--brass);
+    border-radius:14px;padding:26px;width:min(760px, 92vw);max-height:85vh;overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  }
+  .modal-close{float:right;}
+  .elo-hero{display:flex;align-items:baseline;gap:10px;margin-bottom:18px;}
+  .elo-hero .num{font-size:44px;font-weight:700;color:var(--brass-bright);font-family:'Fraunces', serif;}
+  .heat-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .heat-label{width:170px;font-size:12px;color:var(--cream);}
+  .heat-bar-track{flex:1;height:14px;background:var(--wood-900);border-radius:7px;overflow:hidden;border:1px solid var(--wood-700);}
+  .heat-bar-fill{height:100%;background:linear-gradient(90deg, var(--warn), var(--danger));}
+  .homework-card{background:var(--wood-900);border:1px solid var(--wood-700);border-radius:8px;
+    padding:10px 12px;margin-bottom:8px;font-size:13px;}
+  .homework-card b{color:var(--brass-bright);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+const API_BASE = "http://localhost:8000";
+const FILES = ['a','b','c','d','e','f','g','h'];
+const PLAYER_ID = 1; // single-player demo; extend later for multiple accounts
+
+const PIECE_GLYPH = {
+  wK:'\u2654', wQ:'\u2655', wR:'\u2656', wB:'\u2657', wN:'\u2658', wP:'\u2659',
+  bK:'\u265A', bQ:'\u265B', bR:'\u265C', bB:'\u265D', bN:'\u265E', bP:'\u265F'
+};
+
+const QUALITY_COLOR = {
+  Brilliant:'#5c86a0', Best:'#5f7a3c', Good:'#5f7a3c',
+  Inaccuracy:'#c1852f', Mistake:'#b5432b', Blunder:'#7a1f10'
+};
+
+const SLIDER_META = [
+  {key:0, label:'Difficulty', icon:'\u265F'},
+  {key:1, label:'Aggression Bias', icon:'\u2694'},
+  {key:2, label:'Tactical Complexity', icon:'\u265E'},
+  {key:3, label:'Endgame Emphasis', icon:'\u265A'},
+  {key:4, label:'Contempt', icon:'\u2620'},
+];
+
+function evalDescription(cp, mate){
+  if(mate) return (cp>=0?'White':'Black')+' has a forced mate';
+  const abs = Math.abs(cp);
+  const side = cp>=0 ? 'White' : 'Black';
+  if(abs<50) return 'Equal position';
+  if(abs<150) return side+' is slightly better';
+  if(abs<400) return side+' is clearly better';
+  return side+' is winning';
+}
+
+const LICHESS_THEME_MAP = {
+  hanging_piece: 'https://lichess.org/training/hangingPiece',
+  missed_fork: 'https://lichess.org/training/fork',
+  king_safety_collapse: 'https://lichess.org/training/exposedKing',
+  back_rank_weakness: 'https://lichess.org/training/backRankMate',
+  missed_pin_skewer: 'https://lichess.org/training/pin',
+  time_pressure_blunder: 'https://lichess.org/training/master',
+  defensive_inaccuracy: 'https://lichess.org/training/defensiveMove',
+  offensive_miss: 'https://lichess.org/training/advantage',
+  tactical_blindness: 'https://lichess.org/training/middlegame',
+  positional_misjudgment: 'https://lichess.org/training/quietMove',
+};
+
+const MOTIF_LABELS = {
+  hanging_piece:'Hanging piece', missed_fork:'Missed fork', king_safety_collapse:'King safety collapse',
+  back_rank_weakness:'Back-rank weakness', missed_pin_skewer:'Missed pin/skewer',
+  time_pressure_blunder:'Time-pressure blunder', defensive_inaccuracy:'Defensive inaccuracy',
+  offensive_miss:'Offensive miss', tactical_blindness:'Tactical blindness',
+  positional_misjudgment:'Positional misjudgment'
+};
+
+const HOMEWORK_TIPS = {
+  hanging_piece:'Before every move, scan for any of your pieces that are undefended.',
+  missed_fork:'Practice knight-fork puzzles - look for forks 1-2 moves before they happen.',
+  king_safety_collapse:'Review games where your king got exposed; castle earlier next time.',
+  back_rank_weakness:'Make a habit of giving your king a luft square in the endgame.',
+  missed_pin_skewer:'Study classic pin/skewer patterns from master games.',
+  time_pressure_blunder:'Slow down in complex positions - budget your clock earlier.',
+  defensive_inaccuracy:'Work through defensive-resource puzzles from worse positions.',
+  offensive_miss:'Look one move further for a stronger continuation before playing "good enough".',
+  tactical_blindness:'Do daily tactics puzzles to sharpen pattern recognition.',
+  positional_misjudgment:'Study pawn-structure and piece-placement principles.'
+};
+
+function squareId(color, type, square){ return color+type+square; }
+
+function initialPieces(){
+  const back = ['R','N','B','Q','K','B','N','R'];
+  const pieces = [];
+  FILES.forEach((f,i)=>{
+    pieces.push({id:squareId('w',back[i],f+'1'), color:'w', type:back[i], square:f+'1'});
+    pieces.push({id:squareId('w','P',f+'2'), color:'w', type:'P', square:f+'2'});
+    pieces.push({id:squareId('b','P',f+'7'), color:'b', type:'P', square:f+'7'});
+    pieces.push({id:squareId('b',back[i],f+'8'), color:'b', type:back[i], square:f+'8'});
+  });
+  return pieces;
+}
+
+function boardFromChessJs(game){
+  const board = game.board();
+  const pieces = [];
+  for(let row=0; row<8; row++){
+    for(let col=0; col<8; col++){
+      const cell = board[row][col];
+      if(!cell) continue;
+      const square = FILES[col] + (8-row);
+      pieces.push({id:squareId(cell.color, cell.type.toUpperCase(), square)+'_'+row+'_'+col,
+        color:cell.color, type:cell.type.toUpperCase(), square});
+    }
+  }
+  return pieces;
+}
+
+function applyMoveToDisplay(pieces, mv){
+  let next = pieces.slice();
+  // remove normal capture target
+  next = next.filter(p => p.square !== mv.to || p.square === mv.from);
+  // en passant: captured pawn sits on a different square than `to`
+  if(mv.flags && mv.flags.indexOf('e') !== -1){
+    const capturedSquare = mv.to[0] + mv.from[1];
+    next = next.filter(p => p.square !== capturedSquare);
+  }
+  // move the piece itself
+  next = next.map(p => {
+    if(p.square === mv.from && p.color === mv.color){
+      return {...p, square: mv.to, type: mv.promotion ? mv.promotion.toUpperCase() : p.type};
+    }
+    return p;
+  });
+  // castling: also relocate the rook
+  if(mv.flags && mv.flags.indexOf('k') !== -1){
+    const rank = mv.color === 'w' ? '1' : '8';
+    next = next.map(p => p.square === 'h'+rank && p.type==='R' && p.color===mv.color ? {...p, square:'f'+rank} : p);
+  }
+  if(mv.flags && mv.flags.indexOf('q') !== -1){
+    const rank = mv.color === 'w' ? '1' : '8';
+    next = next.map(p => p.square === 'a'+rank && p.type==='R' && p.color===mv.color ? {...p, square:'d'+rank} : p);
+  }
+  return next;
+}
+
+function squareToPct(square){
+  const col = FILES.indexOf(square[0]);
+  const row = 8 - parseInt(square[1], 10);
+  return { left: (col*12.5)+'%', top: (row*12.5)+'%' };
+}
+
+function ResultBadge({result}){
+  const isWin = result === 1;
+  const isDraw = result === 0.5;
+  const ring = isWin ? '#8fae5c' : isDraw ? '#cda254' : '#c1614a';
+  const ribbon = isWin ? '#5f7a3c' : isDraw ? '#9c6633' : '#7a1f10';
+  const text = isWin ? 'YOU WIN' : isDraw ? 'DRAW' : 'YOU LOSE';
+  return (
+    <svg viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="92" fill="none" stroke={ring} strokeWidth="6" strokeDasharray="4 5" opacity="0.85"/>
+      <circle cx="100" cy="100" r="80" fill="none" stroke={ring} strokeWidth="2.5" opacity="0.55"/>
+      <circle cx="100" cy="100" r="66" fill="none" stroke={ring} strokeWidth="1.5" strokeDasharray="1 3" opacity="0.4"/>
+      <text x="100" y="44" textAnchor="middle" fontFamily="Fraunces, serif" fontSize="18" fill={ring}>&#9733; &#9733; &#9733;</text>
+      <g transform="rotate(-4 100 100)">
+        <polygon points="14,86 0,100 14,124 26,124 26,86" fill={ribbon} opacity="0.9"/>
+        <polygon points="186,86 200,100 186,124 174,124 174,86" fill={ribbon} opacity="0.9"/>
+        <rect x="18" y="86" width="164" height="34" fill={ribbon}/>
+        <rect x="18" y="86" width="164" height="34" fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth="1"/>
+        <text x="100" y="109" textAnchor="middle" fontFamily="Fraunces, serif" fontWeight="700"
+          fontSize="21" fill="#f3e6c9" letterSpacing="2">{text}</text>
+      </g>
+      <text x="100" y="164" textAnchor="middle" fontFamily="Fraunces, serif" fontSize="18" fill={ring}>&#9733; &#9733; &#9733;</text>
+    </svg>
+  );
+}
+
+function App(){
+  const gameRef = useRef(new Chess());
+  const [pieces, setPieces] = useState(initialPieces());
+  const [selected, setSelected] = useState(null);
+  const [legalTargets, setLegalTargets] = useState([]);
+  const [lastMove, setLastMove] = useState(null);
+  const [dragging, setDragging] = useState(null); // {id, x, y}
+  const [history, setHistory] = useState([]); // {san, uci}
+  const [engineThinking, setEngineThinking] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [gameResult, setGameResult] = useState(null);   // 1.0 win / 0.0 loss / 0.5 draw (player's side)
+  const [gameOverReason, setGameOverReason] = useState('');
+  const [analysis, setAnalysis] = useState(null);      // NEVER reset to null after first value
+  const [lastError, setLastError] = useState(null);
+  const [quotaNotice, setQuotaNotice] = useState(null);
+  const [coachFull, setCoachFull] = useState('');
+  const [coachShown, setCoachShown] = useState('');
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachSource, setCoachSource] = useState(null); // 'gemini' | 'quota_exceeded' | 'error' | null
+  const [chat, setChat] = useState([]);
+  const [chatText, setChatText] = useState('');
+  const [fenInput, setFenInput] = useState('');
+  const [pgnInput, setPgnInput] = useState('');
+  const [showProfile, setShowProfile] = useState(false);
+  const [showHistoryList, setShowHistoryList] = useState(false);
+  const [gamesList, setGamesList] = useState([]);
+  const [reviewGame, setReviewGame] = useState(null);
+  const [reviewIndex, setReviewIndex] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+  const [engineState, setEngineState] = useState(null);
+  const [evalCp, setEvalCp] = useState(0);
+  const [evalMate, setEvalMate] = useState(false);
+  const [viewingIndex, setViewingIndex] = useState(null); // null = live position; number = previewing that ply
+  const [timerEnabled, setTimerEnabled] = useState(true);
+  const [liveElapsed, setLiveElapsed] = useState(0);
+  const [showPositionTools, setShowPositionTools] = useState(false);
+
+  const boardRef = useRef(null);
+  const moveStartTime = useRef(Date.now());
+  const dragInfo = useRef(null); // {id,color,type,square,pointerId,startX,startY}
+
+  const game = gameRef.current;
+  
+
+  // ---------- typewriter effect for coach note ----------
+  useEffect(()=>{
+    if(!coachFull){ setCoachShown(''); return; }
+    setCoachShown('');
+    let i = 0;
+    const totalMs = 350;
+    const tickMs = 16;
+    const step = Math.max(1, Math.ceil(coachFull.length / (totalMs / tickMs)));
+    const iv = setInterval(()=>{
+      i += step;
+      setCoachShown(coachFull.slice(0, i));
+      if(i >= coachFull.length) clearInterval(iv);
+    }, tickMs);
+    return ()=>clearInterval(iv);
+  }, [coachFull]);
+
+  const uciHistory = useMemo(()=>history.map(h=>h.uci), [history]);
+
+  const reviewPieces = useMemo(()=>{
+    if(!reviewGame || !Array.isArray(reviewGame.moves)) return null;
+    try {
+      const scratch = new Chess();
+      const upto = reviewIndex===null ? reviewGame.moves.length-1 : reviewIndex;     
+      for(let i=0;i<=upto;i++){
+        const u = reviewGame.moves[i];
+        if(!u || typeof u !== 'string' || u.length < 4) break;
+        const mv = scratch.move({from:u.slice(0,2), to:u.slice(2,4), promotion:u.slice(4,5)||'q'});
+        if(!mv) break; // stop replaying rather than crash on a bad/illegal move
+      }
+      return boardFromChessJs(scratch);
+    } catch(err){
+      console.error('[reviewPieces] failed to replay game', reviewGame.game_id, err);
+      return boardFromChessJs(new Chess()); // fall back to starting position instead of crashing
+    }
+  }, [reviewGame, reviewIndex]);
+  const displayPieces = reviewGame ? (reviewPieces || []) : pieces;
+
+  function legalTargetsFor(square){
+    const moves = game.moves({square, verbose:true});
+    return moves.map(m=>({square:m.to, capture: !!m.captured}));
+  }
+
+  function fetchCoachNote(prompt, fallback){
+    const myId = ++coachRequestId.current;
+    setCoachLoading(true);
+    setCoachSource(null);
+    fetch(API_BASE+'/coach-note', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({coaching_prompt: prompt, fallback_note: fallback})
+    }).then(r=>r.json()).then(d=>{
+      if(myId !== coachRequestId.current) return; // a newer move's note already superseded this one
+      setCoachFull(d.ai_note || fallback || '');
+      setCoachSource(d.source || null);
+      setCoachLoading(false);
+      if(d.source === 'quota_exceeded'){
+        setQuotaNotice('Daily AI coaching quota reached - showing engine-only notes until it resets. Move analysis, eval bar and the engine\'s replies are unaffected.');
+      }
+    }).catch(()=>{
+      if(myId !== coachRequestId.current) return;
+      setCoachFull(fallback || '');
+      setCoachSource('error');
+      setCoachLoading(false);
+    });
+  }
+
+  function callAnalyze(movesList, timeSpent){
+    setLastError(null);   // clear any stale banner from a previous move the instant a new one starts
+    setEngineThinking(true);
+    fetch(API_BASE+'/analyze', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({moves: movesList, time_spent_seconds: timeSpent})
+    }).then(r=>r.json()).then(data=>{
+      if(!data.success){
+        console.error('[/analyze] backend returned failure:', data);
+        setLastError(data.ai_note || 'The engine reported a failure - check the backend terminal.');
+        setEngineThinking(false);
+        return;
+      }
+      setLastError(null);
+      // eval bar always shown from White's perspective
+      let whiteCp = data.mover_is_white ? data.eval_cp : -data.eval_cp;
+      setEvalMate(Math.abs(data.eval_cp) >= 29000);
+      setEvalCp(whiteCp);
+      setAnalysis(data);              // overwrite only now that we truly have new data
+      // Board, eval bar and engine's reply move never wait on the AI note -
+      // that call happens separately below so it can take its time (or fail
+      // on quota) without freezing the UI.
+      setTimeout(()=>{
+        if(data.engine_move){ playEngineMove(data.engine_move, movesList); }
+        setEngineThinking(false);
+      }, 700);
+      setCoachFull(data.fallback_note || '');   // shown instantly - no wait for Gemini
+      setCoachSource('fallback');
+      fetchCoachNote(data.coaching_prompt, data.fallback_note);
+    }).catch(err=>{
+      console.error('[/analyze] fetch failed - is the backend running at '+API_BASE+' ?', err);
+      setLastError('Could not reach the backend at '+API_BASE+'. Is it running?');
+      setEngineThinking(false);
+    });
+  }
+
+  function playEngineMove(uci, movesSoFar){
+    const from = uci.slice(0,2), to = uci.slice(2,4), promo = uci.length>4 ? uci.slice(4,5) : undefined;
+    const mv = game.move({from, to, promotion: promo || 'q'});
+    if(!mv) return;
+    setPieces(p => applyMoveToDisplay(p, mv));
+    setLastMove({from, to});
+    const uciMove = from+to+(mv.promotion||'');
+    setHistory(h => [...h, {san: mv.san, uci: uciMove}]);
+    moveStartTime.current = Date.now();
+    checkGameOver(movesSoFar ? [...movesSoFar, uciMove] : undefined);
+  }
+
+  function attemptMove(from, to){
+    if(engineThinking || gameOver || viewingIndex !== null) return;
+    const piece = game.get(from);
+    let promotion = undefined;
+    if(piece && piece.type === 'p' && (to[1]==='8' || to[1]==='1')) promotion = 'q';
+    const mv = game.move({from, to, promotion});
+    setSelected(null); setLegalTargets([]);
+    if(!mv) return;
+    setPieces(p => applyMoveToDisplay(p, mv));
+    setLastMove({from, to});
+    const uci = from+to+(mv.promotion||'');
+    const newHistory = [...history, {san: mv.san, uci}];
+    setHistory(newHistory);
+    // If the timer is off, we still need SOME value for time_spent_seconds,
+    // but a real elapsed time would let the engine flag time-pressure
+    // blunders the player never asked to be tracked for - so send a large
+    // number instead, which keeps that motif from firing.
+    const timeSpent = timerEnabled ? (Date.now() - moveStartTime.current) / 1000 : 999;
+    moveStartTime.current = Date.now();
+    const overNow = checkGameOver(newHistory.map(h=>h.uci));
+    if(!overNow){
+      callAnalyze(newHistory.map(h=>h.uci), timeSpent);
+    }
+  }
+
+  function checkGameOver(finalMoves){
+    if(game.game_over()){
+      setGameOver(true);
+      let result = 0.5;
+      let reason = '50-move rule';
+      if(game.in_checkmate()){
+        // side whose turn it is now just got mated -> the OTHER side won
+        result = game.turn() === 'w' ? 0.0 : 1.0;
+        reason = 'Checkmate';
+      } else if(game.in_stalemate()){
+        reason = 'Stalemate';
+      } else if(game.insufficient_material()){
+        reason = 'Insufficient material';
+      } else if(game.in_threefold_repetition()){
+        reason = 'Threefold repetition';
+      }
+      setGameResult(result);
+      setGameOverReason(reason);
+      endgame(result, finalMoves);
+      return true;
+    }
+    return false;
+  }
+
+  function resetGame(){
+    gameRef.current = new Chess();
+    setPieces(initialPieces());
+    setSelected(null); setLegalTargets([]); setLastMove(null);
+    setDragging(null);
+    setHistory([]);
+    setEngineThinking(false);
+    setGameOver(false); setGameResult(null); setGameOverReason('');
+    setAnalysis(null);
+    setLastError(null); setQuotaNotice(null);
+    setCoachFull(''); setCoachSource(null); setCoachLoading(false);
+    setEvalCp(0); setEvalMate(false);
+    setViewingIndex(null);
+    moveStartTime.current = Date.now();
+  }
+
+  function fetchEngineState(){
+    fetch(API_BASE+'/profile/'+PLAYER_ID).then(r=>r.json()).then(setEngineState).catch(()=>{});
+  }
+
+  useEffect(()=>{ fetchEngineState(); }, []);
+
+  function endgame(result, finalMoves){
+    const moves = finalMoves || (uciHistory.length? uciHistory : history.map(h=>h.uci));
+    fetch(API_BASE+'/endgame', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({moves, player_id: PLAYER_ID, result})
+    }).then(r=>r.json()).then(d=>{
+      fetchEngineState();
+      if(d.success === false){
+        console.error('[/endgame] backend returned failure:', d);
+        setLastError('Saving the finished game failed: '+(d.error||'unknown error')+' - check the backend terminal.');
+      }
+    }).catch(err=>{
+      console.error('[/endgame] fetch failed', err);
+      setLastError('Could not save the finished game to your history - the backend may be unreachable.');
+    });
+  }
+
+  // ---------- pointer-based click + drag-and-drop ----------
+  function onSquarePointerDown(e, square){
+    if(engineThinking || gameOver || viewingIndex !== null || reviewGame) return;
+    const piece = pieces.find(p=>p.square===square);
+    if(selected && legalTargets.some(t=>t.square===square)){
+      attemptMove(selected, square);
+      return;
+    }
+    if(piece && ((piece.color==='w')===(game.turn()==='w'))){
+      dragInfo.current = {square, startX:e.clientX, startY:e.clientY, dragging:false, pieceId:piece.id};
+      setSelected(square);
+      setLegalTargets(legalTargetsFor(square));
+    } else {
+      setSelected(null); setLegalTargets([]);
+    }
+  }
+
+  useEffect(()=>{
+    function onMove(e){
+      if(!dragInfo.current) return;
+      const dx = e.clientX - dragInfo.current.startX;
+      const dy = e.clientY - dragInfo.current.startY;
+      if(!dragInfo.current.dragging && Math.hypot(dx,dy) > 6){
+        dragInfo.current.dragging = true;
+      }
+      if(dragInfo.current.dragging){
+        const rect = boardRef.current.getBoundingClientRect();
+        setDragging({id: dragInfo.current.pieceId, x: e.clientX-rect.left, y: e.clientY-rect.top});
+      }
+    }
+    function onUp(e){
+      if(!dragInfo.current) return;
+      if(dragInfo.current.dragging && boardRef.current){
+        const rect = boardRef.current.getBoundingClientRect();
+        const sq = rect.width/8;
+        let col = Math.floor((e.clientX-rect.left)/sq);
+        let row = Math.floor((e.clientY-rect.top)/sq);
+        col = Math.max(0, Math.min(7,col)); row = Math.max(0, Math.min(7,row));
+        const to = FILES[col] + (8-row);
+        attemptMove(dragInfo.current.square, to);
+      }
+      dragInfo.current = null;
+      setDragging(null);
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return ()=>{ window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
+  }, [pieces, selected, legalTargets, engineThinking, gameOver, history]);
+
+  function jumpToMove(index){
+    // Rebuild position up to that move using the recorded uci history (read-only preview via a scratch game)
+    const scratch = new Chess();
+    for(let i=0;i<=index;i++){
+      const u = history[i].uci;
+      scratch.move({from:u.slice(0,2), to:u.slice(2,4), promotion:u.slice(4,5)||'q'});
+    }
+    setPieces(boardFromChessJs(scratch));
+    setLastMove({from: history[index].uci.slice(0,2), to: history[index].uci.slice(2,4)});
+    setViewingIndex(index);
+  }
+
+  function backToCurrentPosition(){
+    setPieces(boardFromChessJs(game));
+    if(history.length){
+      const last = history[history.length-1].uci;
+      setLastMove({from:last.slice(0,2), to:last.slice(2,4)});
+    }
+    setViewingIndex(null);
+  }
+
+  // ---------- live move-clock ticker (display only; only runs when the timer is enabled) ----------
+  useEffect(()=>{
+    if(!timerEnabled || engineThinking || gameOver || viewingIndex !== null) return;
+    const iv = setInterval(()=>{
+      setLiveElapsed(Math.floor((Date.now() - moveStartTime.current)/1000));
+    }, 250);
+    return ()=>clearInterval(iv);
+  }, [timerEnabled, engineThinking, gameOver, viewingIndex, history.length]);
+
+  useEffect(()=>{ setLiveElapsed(0); }, [history.length]);
+
+  function loadFen(){
+    const ok = game.load(fenInput.trim());
+    if(!ok){ alert('Invalid FEN'); return; }
+    setPieces(boardFromChessJs(game));
+    setHistory([]); setSelected(null); setLegalTargets([]); setLastMove(null); setGameOver(false);
+    moveStartTime.current = Date.now();
+  }
+
+  function loadPgn(){
+    const ok = game.load_pgn(pgnInput.trim());
+    if(!ok){ alert('Invalid PGN'); return; }
+    const verboseHist = game.history({verbose:true});
+    const newHistory = verboseHist.map(m => ({san:m.san, uci: m.from+m.to+(m.promotion||'')}));
+    setHistory(newHistory);
+    setPieces(boardFromChessJs(game));
+    setSelected(null); setLegalTargets([]); setGameOver(game.game_over());
+    moveStartTime.current = Date.now();
+  }
+
+  function sendChat(){
+    if(!chatText.trim()) return;
+    const msg = chatText.trim();
+    setChat(c => [...c, {role:'user', text: msg}]);
+    setChatText('');
+    fetch(API_BASE+'/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg, fen: game.fen()})
+    }).then(r=>r.json()).then(d=>{
+      setChat(c => [...c, {role:'coach', text: d.reply}]);
+    }).catch(()=>{
+      setChat(c => [...c, {role:'coach', text:'(could not reach the coach right now)'}]);
+    });
+  }
+
+  function openProfile(){
+    setShowProfile(true);
+    fetch(API_BASE+'/profile/'+PLAYER_ID).then(r=>r.json()).then(setProfileData).catch(()=>{});
+    fetch(API_BASE+'/games/'+PLAYER_ID).then(r=>r.json()).then(d=>setGamesList(d.games||[])).catch(()=>{});
+  }
+
+  function openHistoryList(){
+    setShowHistoryList(true);
+    fetch(API_BASE+'/games/'+PLAYER_ID).then(r=>r.json()).then(d=>setGamesList(d.games||[])).catch(()=>{});
+  }
+
+  function openGameReview(gameId){
+    fetch(API_BASE+'/game/'+gameId).then(r=>r.json()).then(d=>{
+      if(!d.success){
+        setLastError('Could not load game #'+gameId+': '+(d.error||'unknown error'));
+        return;
+      }
+      setReviewGame(d.game);
+      setReviewIndex(null);
+      setShowProfile(false);
+      setShowHistoryList(false);
+    }).catch(err=>{
+      console.error('[openGameReview] fetch failed', err);
+      setLastError('Could not reach the backend to load that game.');
+    });
+  }
+
+  function closeReview(){
+    setReviewGame(null);
+    setReviewIndex(null);
+  }
+
+  const evalPct = evalMate
+    ? (evalCp > 0 ? 100 : 0)
+    : Math.max(4, Math.min(96, 50 + (evalCp/1200)*50));
+
+  const turnLabel = gameOver
+    ? 'Game Over'
+    : engineThinking
+      ? "Engine is thinking\u2026"
+      : ('Your turn \u2014 ' + (game.turn()==='w' ? 'White' : 'Black'));
+
+  return (
+    <React.Fragment>
+      <div className="topbar">
+        <div className="brand">
+          <div className="brand-mark">&#9812;</div>
+          <div>
+            <h1>Oakwood Chess Coach</h1>
+            <small>Your Personalized Analysis Engine</small>
+          </div>
+        </div>
+        <div style={{display:'flex', gap:16, alignItems:'center'}}>
+          <label style={{
+            display:'flex', alignItems:'center', gap:7, fontSize:12, color:'var(--cream)',
+            cursor: history.length===0 ? 'pointer' : 'not-allowed', opacity: history.length===0 ? 1 : 0.55
+          }} title={history.length===0 ? 'Track how long you spend on each move' : 'Timer setting locks once the game starts'}>
+            <input type="checkbox" checked={timerEnabled} disabled={history.length>0}
+              onChange={e=>setTimerEnabled(e.target.checked)} />
+            Move timer
+          </label>
+          {timerEnabled && history.length>0 && !gameOver && (
+            <span style={{fontSize:12, color:'var(--brass-bright)', fontFamily:'monospace', minWidth:52}}>
+              &#9200; {liveElapsed}s
+            </span>
+          )}
+          <button className="btn btn-ghost" onClick={resetGame}>New Game</button>
+          <button className="btn btn-ghost" onClick={openProfile}>My Profile</button>
+        </div>
+      </div>
+
+      {lastError && (
+        <div style={{
+          background:'#5c2016', border:'1px solid var(--danger)', color:'#fbe4dd',
+          padding:'10px 22px', fontSize:13, display:'flex', justifyContent:'space-between', alignItems:'center'
+        }}>
+          <span>&#9888; {lastError}</span>
+          <button className="btn btn-ghost" style={{padding:'3px 10px', fontSize:12}} onClick={()=>setLastError(null)}>Dismiss</button>
+        </div>
+      )}
+
+      {quotaNotice && (
+        <div style={{
+          background:'#4a3a16', border:'1px solid var(--warn)', color:'#f3e6c9',
+          padding:'10px 22px', fontSize:13, display:'flex', justifyContent:'space-between', alignItems:'center'
+        }}>
+          <span>&#9432; {quotaNotice}</span>
+          <button className="btn btn-ghost" style={{padding:'3px 10px', fontSize:12}} onClick={()=>setQuotaNotice(null)}>Dismiss</button>
+        </div>
+      )}
+
+      <div style={{display:'flex', justifyContent:'center', padding:'5px 0 0'}}>
+        <span style={{
+          background:'linear-gradient(180deg, var(--wood-700), var(--wood-800))',
+          border:'1px solid var(--brass)', borderRadius:20,
+          padding:'7px 22px', fontSize:13, fontWeight:800, letterSpacing:0.4,
+          color: gameOver ? '#e0a06a' : 'var(--brass-bright)',
+          boxShadow:'0 2px 8px rgba(0,0,0,0.3)'
+        }}>
+          {turnLabel}
+        </span>
+      </div>
+
+      <div className="layout">
+        {reviewGame && (
+          <div style={{gridColumn:'1 / -1', display:'flex', justifyContent:'center', marginBottom:-4}}>
+            <div style={{
+              background:'var(--wood-700)', border:'1px solid var(--brass)', borderRadius:20,
+              padding:'6px 18px', fontSize:13, display:'flex', alignItems:'center', gap:12
+            }}>
+              <span>Reviewing Game #{reviewGame.game_id}</span>
+              <button className="btn" style={{padding:'3px 10px', fontSize:11}} onClick={closeReview}>Back to Live Game</button>
+            </div>
+          </div>
+        )}
+        {/* LEFT COLUMN */}
+        <div className="col left">
+          <div className="panel">
+            <h3>Move History <span className="badge">plies: {reviewGame ? reviewGame.moves.length : history.length}</span></h3>
+            {viewingIndex !== null && (
+              <div style={{
+                display:'flex', alignItems:'center', justifyContent:'space-between',
+                background:'var(--wood-900)', border:'1px solid var(--brass)', borderRadius:6,
+                padding:'6px 10px', marginBottom:10, fontSize:12
+              }}>
+                <span>Viewing move {viewingIndex+1}</span>
+                <button className="btn" style={{padding:'4px 10px', fontSize:11}} onClick={backToCurrentPosition}>Current Position</button>
+              </div>
+            )}
+            {reviewGame ? (
+              <React.Fragment>
+                <div style={{marginBottom:8}}>
+                  <span style={{fontSize:11, textTransform:'uppercase', color:'var(--brass)'}}>Total moves</span>
+                  <div className="total-moves-tracker">{Math.ceil(reviewGame.moves.length/2)}</div>
+                </div>
+                <div className="move-history">
+                  {reviewGame.moves.map((u,i)=>{
+                    const detail = reviewGame.moves_detail && reviewGame.moves_detail[i];
+                    const isCurrent = reviewIndex===null ? (i===reviewGame.moves.length-1) : (i===reviewIndex);
+                    return (
+                      <div className="move-row" key={i}
+                        style={{background: isCurrent ? 'var(--wood-700)' : 'transparent', cursor:'pointer'}}
+                        onClick={()=>setReviewIndex(i)}>
+                        <span className="move-num">{i+1}.</span>
+                        <span className="move-san">{detail ? detail.san : u}</span>
+                        {detail && <span className="quality-pill" style={{background: QUALITY_COLOR[detail.quality]||'var(--wood-700)', fontSize:10, marginLeft:6}}>{detail.quality}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{marginTop:8}}>
+                  <button className="btn" style={{fontSize:11, padding:'4px 10px'}} onClick={()=>setReviewIndex(null)}>Jump to final position</button>
+                </div>
+              </React.Fragment>
+            ) : (
+              <React.Fragment>
+                <div style={{marginBottom:8}}>
+                  <span style={{fontSize:11, textTransform:'uppercase', color:'var(--brass)'}}>Total moves</span>
+                  <div className="total-moves-tracker">{Math.ceil(history.length/2)}</div>
+                </div>
+                <div className="move-history">
+                  {history.length===0 && <div style={{fontSize:12, color:'var(--brass)'}}>No moves yet</div>}
+                  {Array.from({length: Math.ceil(history.length/2)}).map((_,i)=>{
+                    const w = history[i*2], b = history[i*2+1];
+                    return (
+                      <div className="move-row" key={i}>
+                        <span className="move-num">{i+1}.</span>
+                        {w && <span className="move-san" onClick={()=>jumpToMove(i*2)}>{w.san}</span>}
+                        {b && <span className="move-san" onClick={()=>jumpToMove(i*2+1)}>{b.san}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </React.Fragment>
+            )}
+          </div>
+
+          <div className="panel">
+            <h3>Coach {coachLoading && <span className="thinking-dot"></span>}</h3>
+            <div className="coach-note">
+              {coachShown || (analysis ? (coachLoading ? 'Thinking...' : '') : "Make a move to get coaching...")}
+            </div>
+            {coachSource === 'quota_exceeded' && !coachLoading && (
+              <div style={{fontSize:11, color:'var(--brass)', marginTop:6}}>(engine-only note - AI quota reached today)</div>
+            )}
+          </div>
+
+          <div className="panel">
+            <h3>Ask Coach</h3>
+            <div className="chat-log">
+              {chat.length===0 && <div style={{fontSize:12, color:'var(--brass)'}}>Ask anything about your game...</div>}
+              {chat.map((m,i)=>(
+                <div key={i} className={"chat-msg "+m.role}>{m.text}</div>
+              ))}
+            </div>
+            <div className="chat-input-row">
+              <input placeholder="Ask your coach..." value={chatText}
+                onChange={e=>setChatText(e.target.value)}
+                onKeyDown={e=>{ if(e.key==='Enter') sendChat(); }} />
+              <button className="btn" onClick={sendChat}>Send</button>
+            </div>
+          </div>
+
+          <div className="panel" style={{padding: showPositionTools ? '10px 14px' : '8px 14px'}}>
+            <h3 style={{marginBottom: showPositionTools ? 7 : 0, cursor:'pointer'}} onClick={()=>setShowPositionTools(s=>!s)}>
+              Play a Position <span style={{fontSize:11}}>{showPositionTools ? '\u25B2' : '\u25BC'}</span>
+            </h3>
+            {showPositionTools && (
+              <React.Fragment>
+                <div className="io-row">
+                  <input placeholder="Paste FEN..." value={fenInput} onChange={e=>setFenInput(e.target.value)} />
+                  <button className="btn" onClick={loadFen}>Load</button>
+                </div>
+                <div className="io-row">
+                  <textarea placeholder="Paste PGN..." value={pgnInput} onChange={e=>setPgnInput(e.target.value)} />
+                  <button className="btn" onClick={loadPgn}>Load</button>
+                </div>
+                <div style={{fontSize:11, color:'var(--brass)'}}>Click a piece, or drag it, to move. Or use FEN/PGN above.</div>
+              </React.Fragment>
+            )}
+          </div>
+        </div>
+
+        {/* CENTER: eval bar + board, sharing one wood frame */}
+        <div className="board-zone">
+          <div className="eval-bar-wrap">
+            <span className="eval-label">{evalMate ? 'MATE' : (evalCp>=0?'+':'')+(evalCp/100).toFixed(2)}</span>
+            <div className="eval-bar">
+              <div className={"eval-fill"+(evalMate?" mate":"")} style={{height: evalPct+'%'}}></div>
+            </div>
+            <span className="eval-label">White / Black</span>
+          </div>
+
+          <div className="board-frame">
+            <div className="corner tl"></div><div className="corner tr"></div>
+            <div className="corner bl"></div><div className="corner br"></div>
+            <div className="board" ref={boardRef}>
+              {Array.from({length:8}).map((_,row)=>Array.from({length:8}).map((__,col)=>{
+                const square = FILES[col]+(8-row);
+                const light = (row+col)%2===0;
+                const isSel = selected===square;
+                const isLast = lastMove && (lastMove.from===square || lastMove.to===square);
+                return (
+                  <div key={square}
+                    className={"square "+(light?"light":"dark")+(isSel?" selected":"")+(isLast?" last-move":"")}
+                    style={{left:(col*12.5)+'%', top:(row*12.5)+'%'}}
+                    onPointerDown={(e)=>onSquarePointerDown(e, square)}>
+                    {col===0 && <span className="sq-coord rank">{8-row}</span>}
+                    {row===7 && <span className="sq-coord file">{FILES[col]}</span>}
+                  </div>
+                );
+              }))}
+
+              {legalTargets.map(t=>{
+                const pct = squareToPct(t.square);
+                return <div key={t.square} className={"dot-target"+(t.capture?" capture":"")} style={pct}><div className="dot"></div></div>;
+              })}
+
+              {(displayPieces || []).map(p=>{
+                const isDragged = dragging && dragging.id===p.id;
+                const style = isDragged
+                  ? {left:(dragging.x - (boardRef.current?boardRef.current.clientWidth/16:35)), top:(dragging.y - (boardRef.current?boardRef.current.clientHeight/16:35))}
+                  : squareToPct(p.square);
+                return (
+                  <div key={p.id}
+                    className={"piece "+(p.color==='w'?'white':'black')+(isDragged?" dragging":"")}
+                    style={style}
+                    onPointerDown={(e)=>onSquarePointerDown(e, p.square)}>
+                    {PIECE_GLYPH[p.color+p.type]}
+                  </div>
+                );
+              })}
+              {gameOver && gameResult !== null && viewingIndex === null && !reviewGame && (
+                <div className="result-overlay">
+                  <div className="result-badge">
+                    <ResultBadge result={gameResult}/>
+                    <button className="btn result-newgame-btn" onClick={resetGame}>New Game</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN */}
+        <div className="col right">
+          <div className="panel">
+            <h3>Evaluation</h3>
+            <div style={{fontSize:30, fontWeight:800, color:'var(--brass-bright)', fontFamily:"'Fraunces', serif"}}>
+              {evalMate ? 'MATE' : (evalCp>=0?'+':'')+(evalCp/100).toFixed(2)}
+            </div>
+            <div style={{fontSize:12, color:'var(--brass)'}}>{evalDescription(evalCp, evalMate)}</div>
+          </div>
+
+          <div className="panel">
+            <h3>Move Analysis {engineThinking && <span className="thinking-dot"></span>}</h3>
+            {reviewGame && (()=>{
+              const idx = reviewIndex===null ? reviewGame.moves.length-1 : reviewIndex;
+              const d = reviewGame.moves_detail && reviewGame.moves_detail[idx];
+              if(!d) return <div style={{fontSize:12, color:'var(--brass)'}}>No detail saved for this move.</div>;
+              return (
+                <React.Fragment>
+                  <div style={{marginBottom:8}}>
+                    <span className="quality-pill" style={{background: QUALITY_COLOR[d.quality] || 'var(--wood-700)'}}>{d.quality}</span>
+                    <span style={{marginLeft:8, fontSize:12, color:'var(--brass)'}}>move {d.move_number} &middot; {d.san}</span>
+                  </div>
+                  <div className="analysis-grid">
+                    <div className="stat-box"><span className="label">CP Loss</span><span className="value">{d.cp_loss}</span></div>
+                    <div className="stat-box"><span className="label">Ply</span><span className="value">{idx+1} / {reviewGame.moves.length}</span></div>
+                  </div>
+                  <div style={{marginBottom:10}}>
+                    <span className="label" style={{fontSize:10, textTransform:'uppercase', color:'var(--brass)'}}>Motifs Triggered</span><br/>
+                    {(!d.motifs || d.motifs.length===0) && <span style={{fontSize:12, color:'var(--brass)'}}>none</span>}
+                    {d.motifs && d.motifs.map(m => <span key={m} className="motif-chip">{MOTIF_LABELS[m]||m}</span>)}
+                  </div>
+                  <span className="label" style={{fontSize:10, textTransform:'uppercase', color:'var(--brass)'}}>Coach's Note</span>
+                  <div className="coach-note" style={{minHeight:0, marginTop:4}}>
+                    {d.ai_note || <span style={{fontStyle:'normal', color:'var(--brass)'}}>No note recorded for this move.</span>}
+                  </div>
+                </React.Fragment>
+              );
+            })()}
+            {!reviewGame && !analysis && <div style={{fontSize:12, color:'var(--brass)'}}>Play a move to see the breakdown.</div>}
+            {!reviewGame && analysis && (
+              <React.Fragment>
+                <div style={{marginBottom:8}}>
+                  <span className="quality-pill" style={{background: QUALITY_COLOR[analysis.quality] || 'var(--wood-700)'}}>{analysis.quality}</span>
+                  <span style={{marginLeft:8, fontSize:12, color:'var(--brass)'}}>move {analysis.move_number} &middot; {analysis.san}</span>
+                </div>
+                <div className="analysis-grid">
+                  <div className="stat-box"><span className="label">CP Loss</span><span className="value">{analysis.cp_loss}</span></div>
+                  <div className="stat-box"><span className="label">Total Moves</span><span className="value">{analysis.total_moves}</span></div>
+                  {analysis.is_top_engine_choice ? (
+                    <div className="stat-box" style={{gridColumn:'1 / -1', background:'linear-gradient(180deg, #3a4a26, #2a3518)', borderColor:'var(--good)'}}>
+                      <span className="label" style={{color:'#a8d17a'}}>&#9733; Engine's Top Choice</span>
+                      <span className="value" style={{fontSize:13}}>You found the best move in this position!</span>
+                    </div>
+                  ) : (
+                    <div className="stat-box" style={{gridColumn:'1 / -1'}}>
+                      <span className="label">Best Alternative</span>
+                      <span className="value">{analysis.best_alternative}</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <span className="label" style={{fontSize:10, textTransform:'uppercase', color:'var(--brass)'}}>Motifs Triggered</span><br/>
+                  {(!analysis.motifs || analysis.motifs.length===0) && <span style={{fontSize:12, color:'var(--brass)'}}>none</span>}
+                  {analysis.motifs && analysis.motifs.map(m => <span key={m} className="motif-chip">{MOTIF_LABELS[m]||m}</span>)}
+                </div>
+              </React.Fragment>
+            )}
+          </div>
+
+          <div className="panel">
+            <h3>Engine Personality</h3>
+            {(!engineState || !engineState.sliders || engineState.sliders.every(v=>v===0)) ? (
+              <div style={{fontSize:12, color:'var(--brass)'}}>Finish a full game to calibrate the engine to your weaknesses.</div>
+            ) : (
+              <React.Fragment>
+                {SLIDER_META.map(s=>{
+                  const val = engineState.sliders[s.key] ?? 0;
+                  const pct = Math.max(0, Math.min(100, ((val+1)/2)*100));
+                  return (
+                    <div key={s.key} style={{marginBottom:10}}>
+                      <div style={{display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--brass)'}}>
+                        <span>{s.icon} {s.label}</span><span>{val.toFixed(2)}</span>
+                      </div>
+                      <div style={{height:6, background:'var(--wood-900)', borderRadius:3, border:'1px solid var(--wood-700)'}}>
+                        <div style={{height:'100%', width:pct+'%', background:'linear-gradient(90deg, var(--wood-600), var(--brass-bright))', borderRadius:3}}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {engineState.engine_config && (
+                  <div style={{fontSize:11, color:'var(--brass)', marginTop:6}}>
+                    Stockfish skill {engineState.engine_config.skill_level} &middot; ~{engineState.engine_config.uci_elo} Elo
+                  </div>
+                )}
+              </React.Fragment>
+            )}
+          </div>
+        </div>
+      </div>
+
+      
+
+      {showProfile && (
+        <div className="modal-backdrop" onClick={()=>setShowProfile(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <button className="btn btn-ghost modal-close" onClick={()=>setShowProfile(false)}>Close</button>
+            <h2 style={{marginTop:0}}>Your Training Cockpit</h2>
+            {!profileData && <div>Loading...</div>}
+            {profileData && (
+              <React.Fragment>
+                <div className="elo-hero">
+                  <span className="num">{Math.round(profileData.elo)}</span>
+                  <span style={{color:'var(--brass)'}}>current rating</span>
+                </div>
+
+                <h3>Progress Timeline</h3>
+                <TimelineChart timeline={profileData.timeline} />
+
+                <h3>Bad Habit Heatmap</h3>
+                {[...profileData.heatmap].sort((a,b)=>b.score-a.score).map(h=>(
+                 <div className="heat-row" key={h.motif}>
+                    <span className="heat-label">{MOTIF_LABELS[h.motif]||h.motif}</span>
+                    <div className="heat-bar-track">
+                      <div className="heat-bar-fill" style={{width:(Math.min(100, h.score*100))+'%'}}></div>
+                    </div>
+                  </div>
+                ))}
+
+                <h3>Homework</h3>
+                {(!profileData.homework || profileData.homework.length===0) && (
+                  <div style={{fontSize:13, color:'var(--brass)'}}>No homework yet - play a full game to generate your study plan.</div>
+                )}
+                {profileData.homework && profileData.homework.map(m=>(
+                  <div className="homework-card" key={m}>
+                    <b>{MOTIF_LABELS[m]||m}</b><br/>{HOMEWORK_TIPS[m] || 'Keep an eye on this pattern in your next games.'}
+                    <br/>
+                    <a href={LICHESS_THEME_MAP[m] || 'https://lichess.org/training'} target="_blank" rel="noopener noreferrer"
+                      style={{color:'var(--brass-bright)', fontSize:12, textDecoration:'underline'}}>
+                      Practice these puzzles on Lichess &rarr;
+                    </a>
+                  </div>
+                ))}
+
+                <h3>Past Games</h3>
+                {gamesList.length===0 && <div style={{fontSize:13, color:'var(--brass)'}}>No games played yet.</div>}
+                {gamesList.map(g=>(
+                  <div key={g.game_id} className="homework-card" style={{cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center'}}
+                    onClick={()=>openGameReview(g.game_id)}>
+                    <span>
+                      <b>Game #{g.game_id}</b><br/>
+                      <span style={{fontSize:11, color:'var(--brass)'}}>{new Date(g.played_at).toLocaleString()}</span>
+                    </span>
+                    <span style={{textAlign:'right', fontSize:12}}>
+                      {g.accuracy_pct!=null && <div>{Math.round(g.accuracy_pct*100)}% accuracy</div>}
+                      {g.acpl!=null && <div style={{color:'var(--brass)'}}>ACPL {g.acpl.toFixed(1)}</div>}
+                      {g.elo_after!=null && <div style={{color:'var(--brass-bright)'}}>Elo {Math.round(g.elo_after)}</div>}
+                    </span>
+                  </div>
+                ))}
+              </React.Fragment>
+            )}
+          </div>
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
+function TimelineChart({timeline}){
+  if(!timeline || timeline.length===0) return <div style={{fontSize:13, color:'var(--brass)', marginBottom:14}}>Play full games to build your timeline.</div>;
+  const w = 680, h = 170, padL = 42, padR = 16, padT = 14, padB = 28;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const n = timeline.length;
+  const xFor = i => padL + (n<=1 ? plotW/2 : i*plotW/(n-1));
+  const yFor = pct => padT + plotH - (pct * plotH);
+  const points = timeline.map((g,i)=> xFor(i)+','+yFor(g.accuracy_pct||0)).join(' ');
+  const yTicks = [0, 0.25, 0.5, 0.75, 1.0];
+  return (
+    <svg width={w} height={h} style={{background:'#1a0f08', borderRadius:8, marginBottom:16}}>
+      {/* gridlines + y-axis labels (accuracy %) */}
+      {yTicks.map(t=>(
+        <g key={t}>
+          <line x1={padL} x2={w-padR} y1={yFor(t)} y2={yFor(t)} stroke="#3a2414" strokeWidth="1" />
+          <text x={padL-8} y={yFor(t)+4} fontSize="10" fill="#cda254" textAnchor="end">{Math.round(t*100)}%</text>
+        </g>
+      ))}
+      {/* x-axis labels (game number) */}
+      {timeline.map((g,i)=>{
+        if(n>12 && i % Math.ceil(n/12) !== 0) return null;
+        return <text key={i} x={xFor(i)} y={h-8} fontSize="10" fill="#cda254" textAnchor="middle">#{i+1}</text>;
+      })}
+      <line x1={padL} x2={padL} y1={padT} y2={h-padB} stroke="#7a4c28" strokeWidth="1.5" />
+      <line x1={padL} x2={w-padR} y1={h-padB} y2={h-padB} stroke="#7a4c28" strokeWidth="1.5" />
+      <text x={padL-30} y={padT-2} fontSize="10" fill="#9c6633">Accuracy</text>
+      <polyline points={points} fill="none" stroke="#cda254" strokeWidth="2.5" />
+      {timeline.map((g,i)=>(
+        <circle key={i} cx={xFor(i)} cy={yFor(g.accuracy_pct||0)} r="3.5" fill="#e7c579">
+          <title>{'Game #'+(i+1)+': '+Math.round((g.accuracy_pct||0)*100)+'% accuracy'}</title>
+        </circle>
+      ))}
+    </svg>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
